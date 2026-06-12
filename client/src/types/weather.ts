@@ -51,3 +51,19 @@ export interface ForecastResponse {
   updatedAt: string;
   cached?: boolean;
 }
+
+export interface HourlyReading {
+  time: string;
+  temperature: number;
+  precipitationProbability: number;
+  windSpeed: number;
+  condition: string;
+  conditionCode: string;
+}
+
+export interface HourlyForecastResponse {
+  location: string;
+  hours: HourlyReading[];
+  updatedAt: string;
+  cached?: boolean;
+}

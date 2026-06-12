@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { SourceReading, ForecastDay } from '../types/weather';
+import type { SourceReading, ForecastDay, HourlyReading } from '../types/weather';
 
 interface GeoResult {
   latitude: number;
@@ -99,4 +99,56 @@ export async function getForecast(city: string, days: number = 7): Promise<Forec
       isDisputed: false,
     } satisfies ForecastDay;
   });
+}
+
+export async function getHourlyForecast(city: string): Promise<HourlyReading[]> {
+  const geo = await geocode(city);
+
+  const { data } = await axios.get('https://api.open-meteo.com/v1/forecast', {
+    params: {
+      latitude: geo.latitude,
+      longitude: geo.longitude,
+      hourly: [
+        'temperature_2m',
+        'precipitation_probability',
+        'wind_speed_10m',
+        'weather_code',
+      ].join(','),
+      forecast_days: 2,
+      wind_speed_unit: 'kmh',
+      timezone: 'auto',
+    },
+  });
+
+  const h = data.hourly;
+  const now = new Date();
+
+  return h.time
+    .map((time: string, i: number) => {
+      const { condition, conditionCode } = wmoCodeToCondition(h.weather_code[i]);
+      return {
+        time,
+        temperature: h.temperature_2m[i],
+        precipitationProbability: h.precipitation_probability[i] ?? 0,
+        windSpeed: h.wind_speed_10m[i],
+        condition,
+        conditionCode,
+      } satisfies HourlyReading;
+    })
+    .filter((h: HourlyReading) => new Date(h.time) >= now)
+    .slice(0, 24);
+}
+
+export async function reverseGeocode(lat: number, lon: number): Promise<string> {
+  const { data } = await axios.get('https://nominatim.openstreetmap.org/reverse', {
+    params: { lat, lon, format: 'json' },
+    headers: { 'User-Agent': 'WeatherWise/1.0' },
+  });
+  return (
+    data.address?.city ??
+    data.address?.town ??
+    data.address?.village ??
+    data.address?.county ??
+    data.display_name.split(',')[0]
+  );
 }

@@ -4,7 +4,94 @@
 
 @layer base {
   body {
-    @apply bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 min-h-screen text-white;
+    @apply min-h-screen text-white;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 }
+
+/* ── Animated weather backgrounds ── */
+
+.wx-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  transition: background 1.5s ease;
+  animation: gradientShift 12s ease infinite alternate;
+}
+
+@keyframes gradientShift {
+  0%   { filter: brightness(1); }
+  50%  { filter: brightness(1.08); }
+  100% { filter: brightness(1); }
+}
+
+/* Clear / sunny */
+.wx-clear {
+  background: linear-gradient(135deg, #1e3a5f 0%, #0f4c81 40%, #1a6b9e 70%, #0e2a4a 100%);
+}
+
+/* Partly cloudy */
+.wx-partly_cloudy {
+  background: linear-gradient(135deg, #1e293b 0%, #1e3a5f 40%, #334155 70%, #1e293b 100%);
+}
+
+/* Cloudy / overcast */
+.wx-cloudy {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #1e293b 100%);
+}
+
+/* Fog */
+.wx-fog {
+  background: linear-gradient(135deg, #374151 0%, #4b5563 50%, #374151 100%);
+  animation: fogDrift 20s ease-in-out infinite alternate;
+}
+@keyframes fogDrift {
+  0%   { filter: brightness(0.9) blur(0px); }
+  100% { filter: brightness(1.05) blur(0.3px); }
+}
+
+/* Rain / drizzle / rain_showers */
+.wx-rain,
+.wx-drizzle,
+.wx-rain_showers {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 40%, #0f2744 70%, #0f172a 100%);
+  animation: rainPulse 6s ease-in-out infinite alternate;
+}
+@keyframes rainPulse {
+  0%   { filter: brightness(0.9); }
+  100% { filter: brightness(1.05); }
+}
+
+/* Snow / snow_showers */
+.wx-snow,
+.wx-snow_showers {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 40%, #475569 70%, #1e293b 100%);
+  animation: snowGlow 8s ease-in-out infinite alternate;
+}
+@keyframes snowGlow {
+  0%   { filter: brightness(0.95) saturate(0.8); }
+  100% { filter: brightness(1.1) saturate(1.1); }
+}
+
+/* Thunderstorm */
+.wx-thunderstorm {
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #312e81 60%, #0f172a 100%);
+  animation: stormFlicker 8s ease-in-out infinite;
+}
+@keyframes stormFlicker {
+  0%, 92%, 100% { filter: brightness(1); }
+  93%           { filter: brightness(1.4); }
+  94%           { filter: brightness(1); }
+  96%           { filter: brightness(1.3); }
+  97%           { filter: brightness(1); }
+}
+
+/* Default fallback */
+.wx-unknown {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+}
+
+/* Thin scrollbar for hour strip */
+.scrollbar-thin::-webkit-scrollbar { height: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }

@@ -1,20 +1,21 @@
 import { Router, Request, Response } from 'express';
 import * as openMeteo from '../services/openMeteo';
 import * as openWeatherMap from '../services/openWeatherMap';
+import * as tomorrowIo from '../services/tomorrowIo';
+import * as weatherApi from '../services/weatherApi';
 import { buildConsensus, mergeForecastDays } from '../services/consensus';
 import { getCached, setCached, buildCacheKey } from '../cache/weatherCache';
-import type { WeatherResponse, ForecastResponse, SourceReading, ForecastDay } from '../types/weather';
+import type { WeatherResponse, ForecastResponse, HourlyForecastResponse, SourceReading, ForecastDay } from '../types/weather';
 
 const router = Router();
 
 async function fetchAllCurrentSources(city: string): Promise<SourceReading[]> {
-  const results = await Promise.allSettled([
-    openMeteo.getCurrentWeather(city),
-    ...(process.env.OPENWEATHERMAP_API_KEY
-      ? [openWeatherMap.getCurrentWeather(city)]
-      : []),
-  ]);
+  const tasks: Promise<SourceReading>[] = [openMeteo.getCurrentWeather(city)];
+  if (process.env.OPENWEATHERMAP_API_KEY) tasks.push(openWeatherMap.getCurrentWeather(city));
+  if (process.env.TOMORROW_IO_API_KEY)    tasks.push(tomorrowIo.getCurrentWeather(city));
+  if (process.env.WEATHERAPI_KEY)         tasks.push(weatherApi.getCurrentWeather(city));
 
+  const results = await Promise.allSettled(tasks);
   const readings: SourceReading[] = [];
   for (const r of results) {
     if (r.status === 'fulfilled') readings.push(r.value);
@@ -24,13 +25,12 @@ async function fetchAllCurrentSources(city: string): Promise<SourceReading[]> {
 }
 
 async function fetchAllForecastSources(city: string, days: number): Promise<ForecastDay[][]> {
-  const results = await Promise.allSettled([
-    openMeteo.getForecast(city, days),
-    ...(process.env.OPENWEATHERMAP_API_KEY
-      ? [openWeatherMap.getForecast(city, days)]
-      : []),
-  ]);
+  const tasks: Promise<ForecastDay[]>[] = [openMeteo.getForecast(city, days)];
+  if (process.env.OPENWEATHERMAP_API_KEY) tasks.push(openWeatherMap.getForecast(city, days));
+  if (process.env.TOMORROW_IO_API_KEY)    tasks.push(tomorrowIo.getForecast(city, days));
+  if (process.env.WEATHERAPI_KEY)         tasks.push(weatherApi.getForecast(city, days));
 
+  const results = await Promise.allSettled(tasks);
   return results
     .filter((r): r is PromiseFulfilledResult<ForecastDay[]> => r.status === 'fulfilled')
     .map(r => r.value);
@@ -94,6 +94,30 @@ router.get('/forecast', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/weather/hourly?city=Toronto
+router.get('/hourly', async (req: Request, res: Response) => {
+  const city = req.query.city as string;
+  if (!city) return res.status(400).json({ error: 'city query param is required' });
+
+  const cacheKey = buildCacheKey(city, 'hourly' as any);
+  const cached = getCached<HourlyForecastResponse>(cacheKey);
+  if (cached) return res.json({ ...cached, cached: true });
+
+  try {
+    const hours = await openMeteo.getHourlyForecast(city);
+    const response: HourlyForecastResponse = {
+      location: city,
+      hours,
+      updatedAt: new Date().toISOString(),
+    };
+    setCached(cacheKey, response);
+    return res.json(response);
+  } catch (err: any) {
+    console.error(err);
+    return res.status(500).json({ error: err.message ?? 'Internal server error' });
+  }
+});
+
 // GET /api/weather/sources?city=Toronto
 router.get('/sources', async (req: Request, res: Response) => {
   const city = req.query.city as string;
@@ -102,6 +126,20 @@ router.get('/sources', async (req: Request, res: Response) => {
   try {
     const readings = await fetchAllCurrentSources(city);
     return res.json({ location: city, sources: readings, updatedAt: new Date().toISOString() });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/weather/geocode/reverse?lat=X&lon=Y
+router.get('/geocode/reverse', async (req: Request, res: Response) => {
+  const lat = parseFloat(req.query.lat as string);
+  const lon = parseFloat(req.query.lon as string);
+  if (isNaN(lat) || isNaN(lon)) return res.status(400).json({ error: 'lat and lon are required' });
+
+  try {
+    const city = await openMeteo.reverseGeocode(lat, lon);
+    return res.json({ city, lat, lon });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
