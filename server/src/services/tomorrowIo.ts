@@ -33,12 +33,51 @@ export async function getCurrentWeather(city: string): Promise<SourceReading> {
 
   const geo = await geocode(city);
 
-  const { data } = await axios.get(`${BASE}/realtime`, {
-    params: { location: `${geo.lat},${geo.lon}`, apikey: apiKey, units: 'metric' },
-  });
+  // Fetch realtime + today's daily in parallel for sunrise/sunset
+  const [realtimeRes, dailyRes] = await Promise.allSettled([
+    axios.get(`${BASE}/realtime`, {
+      params: { location: `${geo.lat},${geo.lon}`, apikey: apiKey, units: 'metric' },
+    }),
+    axios.get(`${BASE}/forecast`, {
+      params: {
+        location: `${geo.lat},${geo.lon}`,
+        apikey: apiKey,
+        units: 'metric',
+        timesteps: '1d',
+      },
+    }),
+  ]);
 
-  const v = data.data.values;
+  if (realtimeRes.status === 'rejected') throw realtimeRes.reason;
+
+  const v = realtimeRes.value.data.data.values;
   const { condition, conditionCode } = tioCodeToCondition(v.weatherCode);
+
+  let sunriseTime: string | undefined;
+  let sunsetTime: string | undefined;
+  if (dailyRes.status === 'fulfilled') {
+    const today = dailyRes.value.data.timelines?.daily?.[0]?.values;
+    if (today?.sunriseTime) {
+      sunriseTime = new Date(today.sunriseTime).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    }
+    if (today?.sunsetTime) {
+      sunsetTime = new Date(today.sunsetTime).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    }
+    if (today?.moonPhase != null) {
+      // Tomorrow.io moon phase: 0=New, 1=Waxing Crescent, 2=First Quarter, 3=Waxing Gibbous,
+      // 4=Full, 5=Waning Gibbous, 6=Last Quarter, 7=Waning Crescent
+      const phases = ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous', 'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent'];
+      // moonPhase is a number 0-7
+    }
+  }
 
   return {
     source: 'Tomorrow.io',
@@ -50,6 +89,15 @@ export async function getCurrentWeather(city: string): Promise<SourceReading> {
     condition,
     conditionCode,
     fetchedAt: new Date().toISOString(),
+    uvIndex: v.uvIndex,
+    pressure: v.pressureSeaLevel,
+    dewPoint: v.dewPoint,
+    visibility: v.visibility,
+    windDirection: v.windDirection,
+    windGust: v.windGust != null ? parseFloat((v.windGust * 3.6).toFixed(1)) : undefined,
+    cloudCover: v.cloudCover,
+    sunriseTime,
+    sunsetTime,
   };
 }
 
@@ -68,9 +116,25 @@ export async function getForecast(city: string, days: number = 7): Promise<Forec
     },
   });
 
+  const phases = ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous', 'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent'];
+
   return data.timelines.daily.slice(0, days).map((d: any) => {
     const v = d.values;
-    const { condition } = tioCodeToCondition(v.weatherCodeMax ?? v.weatherCode);
+    const { condition, conditionCode } = tioCodeToCondition(v.weatherCodeMax ?? v.weatherCode);
+
+    let sunriseTime: string | undefined;
+    let sunsetTime: string | undefined;
+    if (v.sunriseTime) {
+      sunriseTime = new Date(v.sunriseTime).toLocaleTimeString('en-US', {
+        hour: 'numeric', minute: '2-digit', hour12: true,
+      });
+    }
+    if (v.sunsetTime) {
+      sunsetTime = new Date(v.sunsetTime).toLocaleTimeString('en-US', {
+        hour: 'numeric', minute: '2-digit', hour12: true,
+      });
+    }
+
     return {
       date: d.time.split('T')[0],
       high: v.temperatureMax,
@@ -79,7 +143,13 @@ export async function getForecast(city: string, days: number = 7): Promise<Forec
       spreadLow: v.temperatureMin,
       precipitationProbability: v.precipitationProbabilityAvg ?? 0,
       condition,
+      conditionCode,
       isDisputed: false,
+      uvIndexMax: v.uvIndexMax,
+      precipMm: v.precipitationIntensityAvg,
+      windGustMax: v.windGustMax != null ? parseFloat((v.windGustMax * 3.6).toFixed(1)) : undefined,
+      sunriseTime,
+      sunsetTime,
     } satisfies ForecastDay;
   });
 }

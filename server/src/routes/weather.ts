@@ -13,6 +13,7 @@ import type {
   ForecastResponse,
   HourlyForecastResponse,
   AccuracyResponse,
+  AlertsResponse,
   SourceReading,
   ForecastDay,
 } from '../types/weather';
@@ -227,6 +228,25 @@ router.get('/sources', async (req: Request, res: Response) => {
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
+});
+
+// GET /api/weather/alerts?city=Toronto
+router.get('/alerts', async (req: Request, res: Response) => {
+  const city = req.query.city as string;
+  if (!city) return res.status(400).json({ error: 'city query param is required' });
+
+  const cacheKey = buildCacheKey(city, 'alerts' as any);
+  const cached = getCached<AlertsResponse>(cacheKey);
+  if (cached) return res.json({ ...cached, cached: true });
+
+  const alerts = await weatherApi.getAlerts(city);
+  const response: AlertsResponse = {
+    location: city,
+    alerts,
+    updatedAt: new Date().toISOString(),
+  };
+  setCached(cacheKey, response);
+  return res.json(response);
 });
 
 // GET /api/weather/geocode/reverse?lat=X&lon=Y

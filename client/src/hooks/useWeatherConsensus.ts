@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import type { WeatherResponse, ForecastResponse, HourlyForecastResponse, AccuracyResponse } from '../types/weather';
+import type { WeatherResponse, ForecastResponse, HourlyForecastResponse, AccuracyResponse, AlertsResponse } from '../types/weather';
 
 export function useCurrentWeather(city: string) {
   return useQuery<WeatherResponse>({
@@ -55,6 +55,20 @@ export function useAccuracy(city: string) {
       return data;
     },
     enabled: city.trim().length > 0,
-    staleTime: 60 * 60 * 1000, // accuracy changes slowly — 1h stale time
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function useAlerts(city: string) {
+  return useQuery<AlertsResponse>({
+    queryKey: ['weather', 'alerts', city],
+    queryFn: async () => {
+      const { data } = await axios.get<AlertsResponse>('/api/weather/alerts', {
+        params: { city },
+      });
+      return data;
+    },
+    enabled: city.trim().length > 0,
+    staleTime: 15 * 60 * 1000,
   });
 }

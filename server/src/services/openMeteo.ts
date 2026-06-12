@@ -30,6 +30,14 @@ function wmoCodeToCondition(code: number): { condition: string; conditionCode: s
   return { condition: 'Unknown', conditionCode: 'unknown' };
 }
 
+function formatSunTime(isoStr: string): string {
+  return new Date(isoStr).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
 export async function getCurrentWeather(city: string): Promise<SourceReading> {
   const geo = await geocode(city);
 
@@ -44,7 +52,17 @@ export async function getCurrentWeather(city: string): Promise<SourceReading> {
         'wind_speed_10m',
         'precipitation_probability',
         'weather_code',
+        'pressure_msl',
+        'uv_index',
+        'dewpoint_2m',
+        'visibility',
+        'wind_direction_10m',
+        'wind_gusts_10m',
+        'cloud_cover',
+        'precipitation',
       ].join(','),
+      daily: 'sunrise,sunset',
+      forecast_days: 1,
       wind_speed_unit: 'kmh',
       timezone: 'auto',
     },
@@ -63,6 +81,16 @@ export async function getCurrentWeather(city: string): Promise<SourceReading> {
     condition,
     conditionCode,
     fetchedAt: new Date().toISOString(),
+    pressure: c.pressure_msl,
+    uvIndex: c.uv_index,
+    dewPoint: c.dewpoint_2m,
+    visibility: c.visibility != null ? parseFloat((c.visibility / 1000).toFixed(1)) : undefined,
+    windDirection: c.wind_direction_10m,
+    windGust: c.wind_gusts_10m,
+    cloudCover: c.cloud_cover,
+    precipitationMm: c.precipitation,
+    sunriseTime: data.daily?.sunrise?.[0] ? formatSunTime(data.daily.sunrise[0]) : undefined,
+    sunsetTime: data.daily?.sunset?.[0] ? formatSunTime(data.daily.sunset[0]) : undefined,
   };
 }
 
@@ -78,6 +106,12 @@ export async function getForecast(city: string, days: number = 7): Promise<Forec
         'temperature_2m_min',
         'precipitation_probability_max',
         'weather_code',
+        'uv_index_max',
+        'precipitation_sum',
+        'wind_gusts_10m_max',
+        'sunrise',
+        'sunset',
+        'snowfall_sum',
       ].join(','),
       forecast_days: days,
       wind_speed_unit: 'kmh',
@@ -87,7 +121,7 @@ export async function getForecast(city: string, days: number = 7): Promise<Forec
 
   const d = data.daily;
   return d.time.map((date: string, i: number) => {
-    const { condition } = wmoCodeToCondition(d.weather_code[i]);
+    const { condition, conditionCode } = wmoCodeToCondition(d.weather_code[i]);
     return {
       date,
       high: d.temperature_2m_max[i],
@@ -96,7 +130,14 @@ export async function getForecast(city: string, days: number = 7): Promise<Forec
       spreadLow: d.temperature_2m_min[i],
       precipitationProbability: d.precipitation_probability_max[i] ?? 0,
       condition,
+      conditionCode,
       isDisputed: false,
+      uvIndexMax: d.uv_index_max?.[i],
+      precipMm: d.precipitation_sum?.[i],
+      windGustMax: d.wind_gusts_10m_max?.[i],
+      sunriseTime: d.sunrise?.[i] ? formatSunTime(d.sunrise[i]) : undefined,
+      sunsetTime: d.sunset?.[i] ? formatSunTime(d.sunset[i]) : undefined,
+      snowfallMm: d.snowfall_sum?.[i],
     } satisfies ForecastDay;
   });
 }

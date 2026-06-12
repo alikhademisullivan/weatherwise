@@ -1,12 +1,17 @@
 import { useState } from 'react';
 import SearchBar from './components/SearchBar';
 import ConsensusCard from './components/ConsensusCard';
-import WeatherStats from './components/WeatherStats';
+import DetailsPanel from './components/DetailsPanel';
 import SourceBreakdown from './components/SourceBreakdown';
 import ForecastChart from './components/ForecastChart';
 import HourlyChart from './components/HourlyChart';
 import AccuracyLeaderboard from './components/AccuracyLeaderboard';
-import { useCurrentWeather, useForecast, useHourlyForecast, useAccuracy } from './hooks/useWeatherConsensus';
+import AlertsBanner from './components/AlertsBanner';
+import SmartSummary from './components/SmartSummary';
+import SunArc from './components/SunArc';
+import AirQuality from './components/AirQuality';
+import BestTimeWidget from './components/BestTimeWidget';
+import { useCurrentWeather, useForecast, useHourlyForecast, useAccuracy, useAlerts } from './hooks/useWeatherConsensus';
 import { useLocation } from './hooks/useLocation';
 
 type ForecastView = 'daily' | 'hourly';
@@ -32,6 +37,7 @@ export default function App() {
   const { data: forecastData, isLoading: forecastLoading } = useForecast(city);
   const { data: hourlyData, isLoading: hourlyLoading } = useHourlyForecast(city);
   const { data: accuracyData } = useAccuracy(city);
+  const { data: alertsData } = useAlerts(city);
 
   const { locate, loading: locating, error: geoError } = useLocation(newCity => {
     setCity(newCity);
@@ -140,9 +146,37 @@ export default function App() {
           {/* Main content */}
           {weather && !isLoading && (
             <>
+              {/* Severe weather alerts */}
+              {alertsData && alertsData.alerts.length > 0 && (
+                <AlertsBanner alerts={alertsData.alerts} />
+              )}
+
+              {/* Smart summary */}
+              <SmartSummary
+                consensus={weather.consensus}
+                forecast={forecastData?.forecast}
+              />
+
               <ConsensusCard consensus={weather.consensus} location={weather.location} unit={unit} />
 
-              <WeatherStats consensus={weather.consensus} unit={unit} />
+              <DetailsPanel consensus={weather.consensus} unit={unit} />
+
+              {/* Sun arc — shown when sunrise/sunset data is available */}
+              {weather.consensus.sunriseTime && weather.consensus.sunsetTime && (
+                <SunArc
+                  sunriseTime={weather.consensus.sunriseTime}
+                  sunsetTime={weather.consensus.sunsetTime}
+                  moonPhase={weather.consensus.moonPhase}
+                />
+              )}
+
+              {/* Air quality — shown when WeatherAPI provides AQI */}
+              {weather.consensus.airQualityIndex != null && weather.consensus.airQualityCategory && (
+                <AirQuality
+                  aqi={weather.consensus.airQualityIndex}
+                  category={weather.consensus.airQualityCategory}
+                />
+              )}
 
               {showSources && (
                 <SourceBreakdown
@@ -169,7 +203,10 @@ export default function App() {
               {forecastView === 'hourly' && (
                 <>
                   {hourlyData && !hourlyLoading && (
-                    <HourlyChart hours={hourlyData.hours} unit={unit} />
+                    <>
+                      <HourlyChart hours={hourlyData.hours} unit={unit} />
+                      <BestTimeWidget hours={hourlyData.hours} />
+                    </>
                   )}
                   {hourlyLoading && <ForecastSkeleton label="hourly forecast" />}
                 </>
