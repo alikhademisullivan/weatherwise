@@ -2,25 +2,26 @@ import type { SourceReading, ConsensusReading, ForecastDay } from '../types/weat
 
 const DISPUTE_THRESHOLD = parseFloat(process.env.DISPUTE_THRESHOLD_CELSIUS ?? '3');
 
-const SOURCE_WEIGHTS: Record<string, number> = {
+const DEFAULT_WEIGHTS: Record<string, number> = {
   'Open-Meteo': 1.0,
   'OpenWeatherMap': 1.0,
   'Tomorrow.io': 1.0,
   'WeatherAPI': 1.0,
 };
 
-function weight(source: string): number {
-  return SOURCE_WEIGHTS[source] ?? 1.0;
+function weight(source: string, dynamicWeights: Record<string, number>): number {
+  // Dynamic accuracy-based weights take precedence when available
+  return dynamicWeights[source] ?? DEFAULT_WEIGHTS[source] ?? 1.0;
 }
 
-function weightedAvg(readings: SourceReading[], field: keyof Pick<SourceReading, 'temperature' | 'feelsLike' | 'humidity' | 'windSpeed' | 'precipitationProbability'>): number {
-  const totalW = readings.reduce((s, r) => s + weight(r.source), 0);
-  return readings.reduce((s, r) => s + (r[field] as number) * weight(r.source), 0) / totalW;
+function weightedAvg(readings: SourceReading[], field: keyof Pick<SourceReading, 'temperature' | 'feelsLike' | 'humidity' | 'windSpeed' | 'precipitationProbability'>, dynamicWeights: Record<string, number>): number {
+  const totalW = readings.reduce((s, r) => s + weight(r.source, dynamicWeights), 0);
+  return readings.reduce((s, r) => s + (r[field] as number) * weight(r.source, dynamicWeights), 0) / totalW;
 }
 
-function majorityCondition(readings: SourceReading[]): string {
+function majorityCondition(readings: SourceReading[], dynamicWeights: Record<string, number>): string {
   const counts: Record<string, number> = {};
-  for (const r of readings) counts[r.condition] = (counts[r.condition] ?? 0) + weight(r.source);
+  for (const r of readings) counts[r.condition] = (counts[r.condition] ?? 0) + weight(r.source, dynamicWeights);
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 }
 
@@ -31,7 +32,7 @@ function disputeMessage(spread: number, precipSpread: number): string {
   return "Sources are in good agreement on today's forecast.";
 }
 
-export function buildConsensus(readings: SourceReading[], location: string): ConsensusReading {
+export function buildConsensus(readings: SourceReading[], location: string, dynamicWeights: Record<string, number> = {}): ConsensusReading {
   if (!readings.length) throw new Error('No source readings to aggregate');
 
   const temps = readings.map(r => r.temperature);
@@ -41,12 +42,12 @@ export function buildConsensus(readings: SourceReading[], location: string): Con
   const confidenceScore = Math.max(0, Math.round(100 - (spread / 10) * 100));
 
   return {
-    temperature: parseFloat(weightedAvg(readings, 'temperature').toFixed(1)),
-    feelsLike: parseFloat(weightedAvg(readings, 'feelsLike').toFixed(1)),
-    humidity: Math.round(weightedAvg(readings, 'humidity')),
-    windSpeed: parseFloat(weightedAvg(readings, 'windSpeed').toFixed(1)),
-    precipitationProbability: Math.round(weightedAvg(readings, 'precipitationProbability')),
-    condition: majorityCondition(readings),
+    temperature: parseFloat(weightedAvg(readings, 'temperature', dynamicWeights).toFixed(1)),
+    feelsLike: parseFloat(weightedAvg(readings, 'feelsLike', dynamicWeights).toFixed(1)),
+    humidity: Math.round(weightedAvg(readings, 'humidity', dynamicWeights)),
+    windSpeed: parseFloat(weightedAvg(readings, 'windSpeed', dynamicWeights).toFixed(1)),
+    precipitationProbability: Math.round(weightedAvg(readings, 'precipitationProbability', dynamicWeights)),
+    condition: majorityCondition(readings, dynamicWeights),
     sources: readings,
     spread: parseFloat(spread.toFixed(1)),
     confidenceScore,

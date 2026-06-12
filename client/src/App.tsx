@@ -5,7 +5,8 @@ import WeatherStats from './components/WeatherStats';
 import SourceBreakdown from './components/SourceBreakdown';
 import ForecastChart from './components/ForecastChart';
 import HourlyChart from './components/HourlyChart';
-import { useCurrentWeather, useForecast, useHourlyForecast } from './hooks/useWeatherConsensus';
+import AccuracyLeaderboard from './components/AccuracyLeaderboard';
+import { useCurrentWeather, useForecast, useHourlyForecast, useAccuracy } from './hooks/useWeatherConsensus';
 import { useLocation } from './hooks/useLocation';
 
 type ForecastView = 'daily' | 'hourly';
@@ -23,12 +24,14 @@ function conditionBgClass(conditionCode?: string): string {
 export default function App() {
   const [city, setCity] = useState('Toronto');
   const [showSources, setShowSources] = useState(false);
+  const [showAccuracy, setShowAccuracy] = useState(false);
   const [unit, setUnit] = useState<'C' | 'F'>('C');
   const [forecastView, setForecastView] = useState<ForecastView>('daily');
 
   const { data: weather, isLoading, isError, error } = useCurrentWeather(city);
   const { data: forecastData, isLoading: forecastLoading } = useForecast(city);
   const { data: hourlyData, isLoading: hourlyLoading } = useHourlyForecast(city);
+  const { data: accuracyData } = useAccuracy(city);
 
   const { locate, loading: locating, error: geoError } = useLocation(newCity => {
     setCity(newCity);
@@ -38,7 +41,7 @@ export default function App() {
 
   return (
     <>
-      {/* Animated background layer */}
+      {/* Animated background */}
       <div className={conditionBgClass(conditionCode)} aria-hidden="true" />
 
       <div className="min-h-screen px-4 py-8">
@@ -58,14 +61,12 @@ export default function App() {
             initialValue={city}
           />
 
-          {/* Geolocation error */}
           {geoError && (
             <p className="text-center text-amber-400/80 text-xs">{geoError}</p>
           )}
 
-          {/* Controls row */}
+          {/* Controls */}
           <div className="flex items-center justify-between flex-wrap gap-2">
-            {/* °C / °F */}
             <div className="flex gap-1 bg-white/10 rounded-lg p-0.5">
               {(['C', 'F'] as const).map(u => (
                 <button
@@ -80,9 +81,8 @@ export default function App() {
               ))}
             </div>
 
-            <div className="flex items-center gap-3">
-              {/* Forecast view toggle */}
-              {weather && (
+            {weather && (
+              <div className="flex items-center gap-3">
                 <div className="flex gap-1 bg-white/10 rounded-lg p-0.5">
                   {(['daily', 'hourly'] as const).map(v => (
                     <button
@@ -96,10 +96,7 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-              )}
 
-              {/* Source breakdown toggle */}
-              {weather && (
                 <button
                   onClick={() => setShowSources(v => !v)}
                   className="text-xs text-white/50 hover:text-white/80 transition-colors flex items-center gap-1"
@@ -107,8 +104,19 @@ export default function App() {
                   {showSources ? 'Hide' : 'Show'} sources
                   <span className="text-white/30">{showSources ? '▲' : '▼'}</span>
                 </button>
-              )}
-            </div>
+
+                <button
+                  onClick={() => setShowAccuracy(v => !v)}
+                  className="text-xs text-white/50 hover:text-white/80 transition-colors flex items-center gap-1"
+                >
+                  Accuracy
+                  {accuracyData?.usingDynamicWeights && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block ml-0.5" title="Dynamic weights active" />
+                  )}
+                  <span className="text-white/30">{showAccuracy ? '▲' : '▼'}</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Loading */}
@@ -137,10 +145,18 @@ export default function App() {
               <WeatherStats consensus={weather.consensus} unit={unit} />
 
               {showSources && (
-                <SourceBreakdown sources={weather.sources} consensus={weather.consensus} unit={unit} />
+                <SourceBreakdown
+                  sources={weather.sources}
+                  consensus={weather.consensus}
+                  accuracy={accuracyData?.sources ?? []}
+                  unit={unit}
+                />
               )}
 
-              {/* Forecast section */}
+              {showAccuracy && accuracyData && (
+                <AccuracyLeaderboard accuracy={accuracyData} />
+              )}
+
               {forecastView === 'daily' && (
                 <>
                   {forecastData && !forecastLoading && (
@@ -159,16 +175,15 @@ export default function App() {
                 </>
               )}
 
-              {/* Footer meta */}
               <p className="text-center text-white/30 text-xs pb-4">
                 Last updated: {new Date(weather.updatedAt).toLocaleTimeString()}
                 {weather.cached && ' · cached'}
                 {' · '}{weather.sources.length} source{weather.sources.length !== 1 ? 's' : ''}
+                {accuracyData?.usingDynamicWeights && ' · dynamic weights'}
               </p>
             </>
           )}
 
-          {/* Empty state */}
           {!weather && !isLoading && !isError && (
             <div className="rounded-2xl bg-white/5 border border-white/10 p-12 text-center">
               <div className="text-5xl mb-3">🌍</div>

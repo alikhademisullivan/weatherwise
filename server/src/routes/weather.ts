@@ -5,7 +5,17 @@ import * as tomorrowIo from '../services/tomorrowIo';
 import * as weatherApi from '../services/weatherApi';
 import { buildConsensus, mergeForecastDays } from '../services/consensus';
 import { getCached, setCached, buildCacheKey } from '../cache/weatherCache';
-import type { WeatherResponse, ForecastResponse, HourlyForecastResponse, SourceReading, ForecastDay } from '../types/weather';
+import { getDynamicWeights, getAccuracyScores } from '../db/accuracy';
+import { recordPrediction, getUniqueLocations } from '../db/predictions';
+import { dbEnabled } from '../db/pool';
+import type {
+  WeatherResponse,
+  ForecastResponse,
+  HourlyForecastResponse,
+  AccuracyResponse,
+  SourceReading,
+  ForecastDay,
+} from '../types/weather';
 
 const router = Router();
 
@@ -36,6 +46,62 @@ async function fetchAllForecastSources(city: string, days: number): Promise<Fore
     .map(r => r.value);
 }
 
+// Fire-and-forget: record each source's day+1 prediction into the DB
+async function recordForecastPredictions(city: string, perSourceForecasts: ForecastDay[][]): Promise<void> {
+  if (!dbEnabled()) return;
+  try {
+    // Resolve lat/lon once for this city
+    const locations = await getUniqueLocations();
+    const existing = locations.find(l => l.location === city.toLowerCase());
+
+    // We need lat/lon — use Open-Meteo geocoding. Reuse cached if available.
+    let lat: number, lon: number;
+    if (existing) {
+      lat = existing.latitude;
+      lon = existing.longitude;
+    } else {
+      // Geocode via Open-Meteo (already done during the forecast fetch, but no shared cache here)
+      // Use a lightweight approach: re-geocode and cache the result in DB via first prediction row
+      const { data } = await (await import('axios')).default.get('https://geocoding-api.open-meteo.com/v1/search', {
+        params: { name: city, count: 1, language: 'en', format: 'json' },
+      });
+      if (!data.results?.length) return;
+      lat = data.results[0].latitude;
+      lon = data.results[0].longitude;
+    }
+
+    // Tomorrow's date
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const forDate = tomorrow.toISOString().split('T')[0];
+
+    // Build source name list — same order as fetchAllForecastSources
+    const sourceNames: string[] = ['Open-Meteo'];
+    if (process.env.OPENWEATHERMAP_API_KEY) sourceNames.push('OpenWeatherMap');
+    if (process.env.TOMORROW_IO_API_KEY)    sourceNames.push('Tomorrow.io');
+    if (process.env.WEATHERAPI_KEY)         sourceNames.push('WeatherAPI');
+
+    for (let i = 0; i < perSourceForecasts.length; i++) {
+      const days = perSourceForecasts[i];
+      const dayOne = days.find(d => d.date === forDate) ?? days[0];
+      if (!dayOne) continue;
+
+      await recordPrediction(
+        sourceNames[i],
+        city,
+        lat,
+        lon,
+        dayOne.date,
+        dayOne.high,
+        dayOne.low,
+        dayOne.condition,
+      ).catch(() => {}); // never block the response
+    }
+  } catch (err) {
+    console.warn('[Predictions] Failed to record:', (err as Error).message);
+  }
+}
+
 // GET /api/weather/current?city=Toronto
 router.get('/current', async (req: Request, res: Response) => {
   const city = req.query.city as string;
@@ -46,10 +112,13 @@ router.get('/current', async (req: Request, res: Response) => {
   if (cached) return res.json({ ...cached, cached: true });
 
   try {
-    const readings = await fetchAllCurrentSources(city);
+    const [readings, dynamicWeights] = await Promise.all([
+      fetchAllCurrentSources(city),
+      getDynamicWeights(city),
+    ]);
     if (!readings.length) return res.status(502).json({ error: 'All weather sources failed' });
 
-    const consensus = buildConsensus(readings, city);
+    const consensus = buildConsensus(readings, city, dynamicWeights);
     const response: WeatherResponse = {
       location: city,
       consensus,
@@ -78,6 +147,9 @@ router.get('/forecast', async (req: Request, res: Response) => {
   try {
     const perSource = await fetchAllForecastSources(city, days);
     if (!perSource.length) return res.status(502).json({ error: 'All forecast sources failed' });
+
+    // Record predictions for accuracy tracking (non-blocking)
+    recordForecastPredictions(city, perSource);
 
     const forecast = mergeForecastDays(perSource);
     const response: ForecastResponse = {
@@ -116,6 +188,32 @@ router.get('/hourly', async (req: Request, res: Response) => {
     console.error(err);
     return res.status(500).json({ error: err.message ?? 'Internal server error' });
   }
+});
+
+// GET /api/weather/accuracy?city=Toronto
+router.get('/accuracy', async (req: Request, res: Response) => {
+  const city = req.query.city as string;
+  if (!city) return res.status(400).json({ error: 'city query param is required' });
+
+  const accuracyRows = await getAccuracyScores(city);
+  const dynamicWeights = await getDynamicWeights(city);
+
+  const sources = accuracyRows.map(r => ({
+    source: r.source,
+    mae: Number(r.mae),
+    accuracyScore: Number(r.accuracy_score),
+    sampleCount: r.sample_count,
+    weight: dynamicWeights[r.source] ?? 1.0,
+  }));
+
+  const response: AccuracyResponse = {
+    location: city,
+    sources,
+    usingDynamicWeights: sources.length > 0,
+    updatedAt: new Date().toISOString(),
+  };
+
+  return res.json(response);
 });
 
 // GET /api/weather/sources?city=Toronto

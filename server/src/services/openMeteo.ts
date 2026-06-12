@@ -139,6 +139,34 @@ export async function getHourlyForecast(city: string): Promise<HourlyReading[]> 
     .slice(0, 24);
 }
 
+export async function getYesterdaysActual(lat: number, lon: number): Promise<{ high: number; low: number; condition: string } | null> {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dateStr = yesterday.toISOString().split('T')[0];
+
+  try {
+    const { data } = await axios.get('https://api.open-meteo.com/v1/forecast', {
+      params: {
+        latitude: lat,
+        longitude: lon,
+        daily: ['temperature_2m_max', 'temperature_2m_min', 'weather_code'].join(','),
+        past_days: 1,
+        forecast_days: 0,
+        timezone: 'auto',
+      },
+    });
+
+    const d = data.daily;
+    const idx = d.time.indexOf(dateStr);
+    if (idx === -1) return null;
+
+    const { condition } = wmoCodeToCondition(d.weather_code[idx]);
+    return { high: d.temperature_2m_max[idx], low: d.temperature_2m_min[idx], condition };
+  } catch {
+    return null;
+  }
+}
+
 export async function reverseGeocode(lat: number, lon: number): Promise<string> {
   const { data } = await axios.get('https://nominatim.openstreetmap.org/reverse', {
     params: { lat, lon, format: 'json' },

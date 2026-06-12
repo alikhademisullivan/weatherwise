@@ -259,7 +259,7 @@ cd server && node dist/index.js
 
 ## Development Phases
 
-### Phase 1 — MVP (current)
+### Phase 1 — MVP
 - [x] Express server with Open-Meteo + OpenWeatherMap adapters
 - [x] Consensus and dispute logic
 - [x] In-memory cache
@@ -269,15 +269,65 @@ cd server && node dist/index.js
 - [x] Unit tests for consensus logic
 
 ### Phase 2 — Polish
-- [ ] Tomorrow.io and WeatherAPI.com adapters
-- [ ] Geolocation (`navigator.geolocation`)
-- [ ] Hourly forecast view
-- [ ] Animated weather condition backgrounds
+- [x] Tomorrow.io and WeatherAPI.com adapters (all 4 sources active)
+- [x] Geolocation (`navigator.geolocation` + reverse geocode)
+- [x] 24-hour hourly forecast view (daily/hourly toggle)
+- [x] Animated weather condition backgrounds
 
 ### Phase 3 — Smart Weighting
-- [ ] PostgreSQL: store predictions vs. actual outcomes per source
-- [ ] Rolling accuracy score per source per region
-- [ ] Feed accuracy scores into weighted averages dynamically
+- [x] PostgreSQL: predictions table records each source's day+1 forecast
+- [x] Actuals table populated nightly via Open-Meteo `past_days=1`
+- [x] Rolling 30-day MAE computed per source per city (nightly cron at 02:15)
+- [x] Accuracy scores fed back into consensus weighted average dynamically
+- [x] `GET /api/weather/accuracy` endpoint exposes scores + active weights
+- [x] Accuracy leaderboard UI with per-source score bar and weight multiplier
+- [x] Accuracy badge shown inline in source breakdown panel
+- [x] Green dot indicator in header when dynamic weights are active
+
+---
+
+## Phase 3 Setup — PostgreSQL
+
+Phase 3 is fully optional. Without `DATABASE_URL`, the app uses equal weights.
+
+### Local PostgreSQL (quick start)
+
+```bash
+# macOS
+brew install postgresql@16 && brew services start postgresql@16
+
+# Ubuntu / Debian
+sudo apt install postgresql && sudo systemctl start postgresql
+```
+
+```bash
+createdb weatherwise
+```
+
+Add to your `.env`:
+```bash
+DATABASE_URL=postgresql://localhost/weatherwise
+```
+
+The server runs migrations automatically on startup — no manual SQL needed.
+
+### Hosted PostgreSQL
+
+Works out of the box with [Supabase](https://supabase.com), [Render](https://render.com), [Railway](https://railway.app), or [Neon](https://neon.tech) (all have free tiers).
+
+```bash
+DATABASE_URL=postgresql://user:password@host:5432/weatherwise
+DATABASE_SSL=true   # required for most hosted providers
+```
+
+### How accuracy tracking works
+
+1. On every `/api/weather/forecast` call, each source's predicted high/low for **tomorrow** is stored in the `predictions` table.
+2. Every night at **02:15**, a cron job fetches yesterday's actual temperature from Open-Meteo's historical endpoint (`past_days=1`) and upserts it into the `actuals` table.
+3. For each (source, city) pair, the job computes **30-day rolling MAE** (mean absolute error on the daily average temperature).
+4. `accuracy_score = max(0, 100 - MAE × 10)` — a source with 0°C error scores 100%, 10°C error scores 0%.
+5. The consensus `buildConsensus()` call loads these scores as weights: higher accuracy → more influence on the final temperature.
+6. Weights have a floor of 0.1 so no source is completely silenced while it's still learning.
 
 ---
 
@@ -287,10 +337,12 @@ cd server && node dist/index.js
 |---|---|---|
 | `PORT` | `3001` | Express server port |
 | `OPENWEATHERMAP_API_KEY` | — | OWM API key (free tier: 1k calls/day) |
-| `TOMORROW_IO_API_KEY` | — | Tomorrow.io API key (Phase 2) |
-| `WEATHERAPI_KEY` | — | WeatherAPI.com key (Phase 2) |
+| `TOMORROW_IO_API_KEY` | — | Tomorrow.io API key (free tier: 500 calls/day) |
+| `WEATHERAPI_KEY` | — | WeatherAPI.com key (free tier: 1M calls/month) |
 | `CACHE_TTL_SECONDS` | `600` | Cache lifetime per city in seconds |
 | `DISPUTE_THRESHOLD_CELSIUS` | `3` | Spread (°C) that triggers the dispute badge |
+| `DATABASE_URL` | — | PostgreSQL connection string (Phase 3, optional) |
+| `DATABASE_SSL` | — | Set to `true` for hosted Postgres providers |
 
 ---
 

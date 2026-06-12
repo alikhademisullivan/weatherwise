@@ -64,3 +64,18 @@ export interface HourlyForecastResponse {
   hours: HourlyReading[];
   updatedAt: string;
 }
+
+export interface SourceAccuracy {
+  source: string;
+  mae: number;
+  accuracyScore: number;
+  sampleCount: number;
+  weight: number;
+}
+
+export interface AccuracyResponse {
+  location: string;
+  sources: SourceAccuracy[];
+  usingDynamicWeights: boolean;
+  updatedAt: string;
+}
