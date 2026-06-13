@@ -26,13 +26,14 @@ function epaIndexToCategory(idx: number): string {
   return 'Hazardous';
 }
 
-export async function getCurrentWeather(city: string): Promise<SourceReading> {
+export async function getCurrentWeather(city: string, coords?: { lat: number; lon: number }): Promise<SourceReading> {
   const apiKey = process.env.WEATHERAPI_KEY;
   if (!apiKey) throw new Error('WEATHERAPI_KEY not set');
 
+  const q = coords ? `${coords.lat},${coords.lon}` : city;
   // Use forecast.json so we get astronomy (sunrise/sunset) in one call
   const { data } = await axios.get(`${BASE}/forecast.json`, {
-    params: { key: apiKey, q: city, days: 1, aqi: 'yes', alerts: 'no' },
+    params: { key: apiKey, q, days: 1, aqi: 'yes', alerts: 'no' },
   });
 
   const c = data.current;
@@ -67,15 +68,16 @@ export async function getCurrentWeather(city: string): Promise<SourceReading> {
   };
 }
 
-export async function getForecast(city: string, days: number = 7): Promise<ForecastDay[]> {
+export async function getForecast(city: string, days: number = 7, coords?: { lat: number; lon: number }): Promise<ForecastDay[]> {
   const apiKey = process.env.WEATHERAPI_KEY;
   if (!apiKey) throw new Error('WEATHERAPI_KEY not set');
 
+  const q = coords ? `${coords.lat},${coords.lon}` : city;
   // WeatherAPI free tier supports up to 3 days; clamp
   const clampedDays = Math.min(days, 3);
 
   const { data } = await axios.get(`${BASE}/forecast.json`, {
-    params: { key: apiKey, q: city, days: clampedDays, aqi: 'no', alerts: 'no' },
+    params: { key: apiKey, q, days: clampedDays, aqi: 'no', alerts: 'no' },
   });
 
   return data.forecast.forecastday.map((d: any) => {
@@ -100,13 +102,14 @@ export async function getForecast(city: string, days: number = 7): Promise<Forec
   });
 }
 
-export async function getAlerts(city: string): Promise<WeatherAlert[]> {
+export async function getAlerts(city: string, coords?: { lat: number; lon: number }): Promise<WeatherAlert[]> {
   const apiKey = process.env.WEATHERAPI_KEY;
   if (!apiKey) return [];
 
+  const q = coords ? `${coords.lat},${coords.lon}` : city;
   try {
     const { data } = await axios.get(`${BASE}/forecast.json`, {
-      params: { key: apiKey, q: city, days: 1, aqi: 'no', alerts: 'yes' },
+      params: { key: apiKey, q, days: 1, aqi: 'no', alerts: 'yes' },
     });
 
     const raw = data.alerts?.alert ?? [];

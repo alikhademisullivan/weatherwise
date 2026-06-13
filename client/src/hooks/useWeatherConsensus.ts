@@ -2,12 +2,18 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import type { WeatherResponse, ForecastResponse, HourlyForecastResponse, AccuracyResponse, AlertsResponse } from '../types/weather';
 
-export function useCurrentWeather(city: string) {
+type Coords = { lat: number; lon: number } | null | undefined;
+
+function coordsParams(coords: Coords) {
+  return coords ? { lat: coords.lat, lon: coords.lon } : {};
+}
+
+export function useCurrentWeather(city: string, coords?: Coords) {
   return useQuery<WeatherResponse>({
-    queryKey: ['weather', 'current', city],
+    queryKey: ['weather', 'current', city, coords?.lat, coords?.lon],
     queryFn: async () => {
       const { data } = await axios.get<WeatherResponse>('/api/weather/current', {
-        params: { city },
+        params: { city, ...coordsParams(coords) },
       });
       return data;
     },
@@ -17,12 +23,12 @@ export function useCurrentWeather(city: string) {
   });
 }
 
-export function useForecast(city: string, days: number = 7) {
+export function useForecast(city: string, coords?: Coords, days: number = 7) {
   return useQuery<ForecastResponse>({
-    queryKey: ['weather', 'forecast', city, days],
+    queryKey: ['weather', 'forecast', city, coords?.lat, coords?.lon, days],
     queryFn: async () => {
       const { data } = await axios.get<ForecastResponse>('/api/weather/forecast', {
-        params: { city, days },
+        params: { city, days, ...coordsParams(coords) },
       });
       return data;
     },
@@ -31,12 +37,12 @@ export function useForecast(city: string, days: number = 7) {
   });
 }
 
-export function useHourlyForecast(city: string) {
+export function useHourlyForecast(city: string, coords?: Coords) {
   return useQuery<HourlyForecastResponse>({
-    queryKey: ['weather', 'hourly', city],
+    queryKey: ['weather', 'hourly', city, coords?.lat, coords?.lon],
     queryFn: async () => {
       const { data } = await axios.get<HourlyForecastResponse>('/api/weather/hourly', {
-        params: { city },
+        params: { city, ...coordsParams(coords) },
       });
       return data;
     },
@@ -59,12 +65,12 @@ export function useAccuracy(city: string) {
   });
 }
 
-export function useAlerts(city: string) {
+export function useAlerts(city: string, coords?: Coords) {
   return useQuery<AlertsResponse>({
-    queryKey: ['weather', 'alerts', city],
+    queryKey: ['weather', 'alerts', city, coords?.lat, coords?.lon],
     queryFn: async () => {
       const { data } = await axios.get<AlertsResponse>('/api/weather/alerts', {
-        params: { city },
+        params: { city, ...coordsParams(coords) },
       });
       return data;
     },

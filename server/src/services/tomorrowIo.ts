@@ -27,11 +27,11 @@ function tioCodeToCondition(code: number): { condition: string; conditionCode: s
   return { condition: 'Unknown', conditionCode: 'unknown' };
 }
 
-export async function getCurrentWeather(city: string): Promise<SourceReading> {
+export async function getCurrentWeather(city: string, coords?: { lat: number; lon: number }): Promise<SourceReading> {
   const apiKey = process.env.TOMORROW_IO_API_KEY;
   if (!apiKey) throw new Error('TOMORROW_IO_API_KEY not set');
 
-  const geo = await geocode(city);
+  const geo = coords ? { lat: coords.lat, lon: coords.lon, name: city.split(',')[0].trim() } : await geocode(city);
 
   // Fetch realtime + today's daily in parallel for sunrise/sunset
   const [realtimeRes, dailyRes] = await Promise.allSettled([
@@ -101,11 +101,11 @@ export async function getCurrentWeather(city: string): Promise<SourceReading> {
   };
 }
 
-export async function getForecast(city: string, days: number = 7): Promise<ForecastDay[]> {
+export async function getForecast(city: string, days: number = 7, coords?: { lat: number; lon: number }): Promise<ForecastDay[]> {
   const apiKey = process.env.TOMORROW_IO_API_KEY;
   if (!apiKey) throw new Error('TOMORROW_IO_API_KEY not set');
 
-  const geo = await geocode(city);
+  const geo = coords ? { lat: coords.lat, lon: coords.lon, name: city.split(',')[0].trim() } : await geocode(city);
 
   const { data } = await axios.get(`${BASE}/forecast`, {
     params: {

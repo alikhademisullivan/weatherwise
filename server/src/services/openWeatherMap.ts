@@ -23,12 +23,13 @@ function formatSunTime(unixTs: number): string {
   });
 }
 
-export async function getCurrentWeather(city: string): Promise<SourceReading> {
+export async function getCurrentWeather(city: string, coords?: { lat: number; lon: number }): Promise<SourceReading> {
   const apiKey = process.env.OPENWEATHERMAP_API_KEY;
   if (!apiKey) throw new Error('OPENWEATHERMAP_API_KEY not set');
 
+  const locParam = coords ? { lat: coords.lat, lon: coords.lon } : { q: city };
   const { data } = await axios.get(`${BASE}/weather`, {
-    params: { q: city, appid: apiKey, units: 'metric' },
+    params: { ...locParam, appid: apiKey, units: 'metric' },
   });
 
   const { condition, conditionCode } = owmCodeToCondition(
@@ -61,12 +62,13 @@ export async function getCurrentWeather(city: string): Promise<SourceReading> {
   };
 }
 
-export async function getForecast(city: string, days: number = 7): Promise<ForecastDay[]> {
+export async function getForecast(city: string, days: number = 7, coords?: { lat: number; lon: number }): Promise<ForecastDay[]> {
   const apiKey = process.env.OPENWEATHERMAP_API_KEY;
   if (!apiKey) throw new Error('OPENWEATHERMAP_API_KEY not set');
 
+  const locParam = coords ? { lat: coords.lat, lon: coords.lon } : { q: city };
   const { data } = await axios.get(`${BASE}/forecast`, {
-    params: { q: city, appid: apiKey, units: 'metric', cnt: days * 8 },
+    params: { ...locParam, appid: apiKey, units: 'metric', cnt: days * 8 },
   });
 
   // OWM returns 3-hour intervals; bucket by date and take daily high/low

@@ -28,19 +28,23 @@ function conditionBgClass(conditionCode?: string): string {
 
 export default function App() {
   const [city, setCity] = useState('Toronto');
+  const [searchValue, setSearchValue] = useState('Toronto');
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [showSources, setShowSources] = useState(false);
   const [showAccuracy, setShowAccuracy] = useState(false);
   const [unit, setUnit] = useState<'C' | 'F'>('C');
   const [forecastView, setForecastView] = useState<ForecastView>('daily');
 
-  const { data: weather, isLoading, isError, error } = useCurrentWeather(city);
-  const { data: forecastData, isLoading: forecastLoading } = useForecast(city);
-  const { data: hourlyData, isLoading: hourlyLoading } = useHourlyForecast(city);
+  const { data: weather, isLoading, isError, error } = useCurrentWeather(city, coords);
+  const { data: forecastData, isLoading: forecastLoading } = useForecast(city, coords);
+  const { data: hourlyData, isLoading: hourlyLoading } = useHourlyForecast(city, coords);
   const { data: accuracyData } = useAccuracy(city);
-  const { data: alertsData } = useAlerts(city);
+  const { data: alertsData } = useAlerts(city, coords);
 
   const { locate, loading: locating, error: geoError } = useLocation(newCity => {
     setCity(newCity);
+    setSearchValue(newCity);
+    setCoords(null);
   });
 
   const conditionCode = weather?.consensus.sources[0]?.conditionCode;
@@ -61,10 +65,11 @@ export default function App() {
 
           {/* Search */}
           <SearchBar
-            onSearch={setCity}
+            value={searchValue}
+            onValueChange={setSearchValue}
+            onSearch={(cityLabel, c) => { setCity(cityLabel); setCoords(c ?? null); }}
             onLocate={locate}
             locating={locating}
-            initialValue={city}
           />
 
           {geoError && (

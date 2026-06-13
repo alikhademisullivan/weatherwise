@@ -38,8 +38,8 @@ function formatSunTime(isoStr: string): string {
   });
 }
 
-export async function getCurrentWeather(city: string): Promise<SourceReading> {
-  const geo = await geocode(city);
+export async function getCurrentWeather(city: string, coords?: { lat: number; lon: number }): Promise<SourceReading> {
+  const geo = coords ? { latitude: coords.lat, longitude: coords.lon } : await geocode(city);
 
   const { data } = await axios.get('https://api.open-meteo.com/v1/forecast', {
     params: {
@@ -94,8 +94,8 @@ export async function getCurrentWeather(city: string): Promise<SourceReading> {
   };
 }
 
-export async function getForecast(city: string, days: number = 7): Promise<ForecastDay[]> {
-  const geo = await geocode(city);
+export async function getForecast(city: string, days: number = 7, coords?: { lat: number; lon: number }): Promise<ForecastDay[]> {
+  const geo = coords ? { latitude: coords.lat, longitude: coords.lon } : await geocode(city);
 
   const { data } = await axios.get('https://api.open-meteo.com/v1/forecast', {
     params: {
@@ -142,8 +142,8 @@ export async function getForecast(city: string, days: number = 7): Promise<Forec
   });
 }
 
-export async function getHourlyForecast(city: string): Promise<HourlyReading[]> {
-  const geo = await geocode(city);
+export async function getHourlyForecast(city: string, coords?: { lat: number; lon: number }): Promise<HourlyReading[]> {
+  const geo = coords ? { latitude: coords.lat, longitude: coords.lon } : await geocode(city);
 
   const { data } = await axios.get('https://api.open-meteo.com/v1/forecast', {
     params: {
