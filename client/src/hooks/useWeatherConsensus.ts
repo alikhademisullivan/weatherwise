@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import type { WeatherResponse, ForecastResponse, HourlyForecastResponse, AccuracyResponse, AlertsResponse } from '../types/weather';
+import type { WeatherResponse, ForecastResponse, HourlyForecastResponse, AccuracyResponse, AlertsResponse, FeedbackSummary } from '../types/weather';
 
 type Coords = { lat: number; lon: number } | null | undefined;
 
@@ -76,5 +76,17 @@ export function useAlerts(city: string, coords?: Coords) {
     },
     enabled: city.trim().length > 0,
     staleTime: 15 * 60 * 1000,
+  });
+}
+
+export function useFeedbackSummary(city: string) {
+  return useQuery<FeedbackSummary & { city: string }>({
+    queryKey: ['weather', 'feedback-summary', city],
+    queryFn: async () => {
+      const { data } = await axios.get('/api/weather/feedback-summary', { params: { city } });
+      return data;
+    },
+    enabled: city.trim().length > 0,
+    staleTime: 5 * 60 * 1000,
   });
 }

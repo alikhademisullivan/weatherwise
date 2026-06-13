@@ -8,6 +8,7 @@ import { buildConsensus, mergeForecastDays } from '../services/consensus';
 import { getCached, setCached, buildCacheKey } from '../cache/weatherCache';
 import { getDynamicWeights, getAccuracyScores } from '../db/accuracy';
 import { recordPrediction, getUniqueLocations } from '../db/predictions';
+import { recordFeedback, getFeedbackSummary, type FeedbackType } from '../db/feedback';
 import { dbEnabled } from '../db/pool';
 import type {
   WeatherResponse,
@@ -22,30 +23,39 @@ import type {
 const router = Router();
 
 async function fetchAllCurrentSources(city: string, coords?: { lat: number; lon: number }): Promise<SourceReading[]> {
-  const tasks: Promise<SourceReading>[] = [openMeteo.getCurrentWeather(city, coords)];
-  if (process.env.OPENWEATHERMAP_API_KEY) tasks.push(openWeatherMap.getCurrentWeather(city, coords));
-  if (process.env.TOMORROW_IO_API_KEY)    tasks.push(tomorrowIo.getCurrentWeather(city, coords));
-  if (process.env.WEATHERAPI_KEY)         tasks.push(weatherApi.getCurrentWeather(city, coords));
+  const named: Array<{ name: string; task: Promise<SourceReading> }> = [
+    { name: 'Open-Meteo',      task: openMeteo.getCurrentWeather(city, coords) },
+  ];
+  if (process.env.OPENWEATHERMAP_API_KEY) named.push({ name: 'OpenWeatherMap', task: openWeatherMap.getCurrentWeather(city, coords) });
+  if (process.env.TOMORROW_IO_API_KEY)    named.push({ name: 'Tomorrow.io',    task: tomorrowIo.getCurrentWeather(city, coords) });
+  if (process.env.WEATHERAPI_KEY)         named.push({ name: 'WeatherAPI',      task: weatherApi.getCurrentWeather(city, coords) });
 
-  const results = await Promise.allSettled(tasks);
+  const results = await Promise.allSettled(named.map(n => n.task));
   const readings: SourceReading[] = [];
-  for (const r of results) {
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
     if (r.status === 'fulfilled') readings.push(r.value);
-    else console.warn('Source fetch failed:', r.reason?.message);
+    else console.warn(`[weather] ${named[i].name} fetch failed:`, r.reason?.response?.status ?? r.reason?.message);
   }
   return readings;
 }
 
 async function fetchAllForecastSources(city: string, days: number, coords?: { lat: number; lon: number }): Promise<ForecastDay[][]> {
-  const tasks: Promise<ForecastDay[]>[] = [openMeteo.getForecast(city, days, coords)];
-  if (process.env.OPENWEATHERMAP_API_KEY) tasks.push(openWeatherMap.getForecast(city, days, coords));
-  if (process.env.TOMORROW_IO_API_KEY)    tasks.push(tomorrowIo.getForecast(city, days, coords));
-  if (process.env.WEATHERAPI_KEY)         tasks.push(weatherApi.getForecast(city, days, coords));
+  const named: Array<{ name: string; task: Promise<ForecastDay[]> }> = [
+    { name: 'Open-Meteo',      task: openMeteo.getForecast(city, days, coords) },
+  ];
+  if (process.env.OPENWEATHERMAP_API_KEY) named.push({ name: 'OpenWeatherMap', task: openWeatherMap.getForecast(city, days, coords) });
+  if (process.env.TOMORROW_IO_API_KEY)    named.push({ name: 'Tomorrow.io',    task: tomorrowIo.getForecast(city, days, coords) });
+  if (process.env.WEATHERAPI_KEY)         named.push({ name: 'WeatherAPI',      task: weatherApi.getForecast(city, days, coords) });
 
-  const results = await Promise.allSettled(tasks);
-  return results
-    .filter((r): r is PromiseFulfilledResult<ForecastDay[]> => r.status === 'fulfilled')
-    .map(r => r.value);
+  const results = await Promise.allSettled(named.map(n => n.task));
+  const forecasts: ForecastDay[][] = [];
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    if (r.status === 'fulfilled') forecasts.push(r.value);
+    else console.warn(`[forecast] ${named[i].name} fetch failed:`, r.reason?.response?.status ?? r.reason?.message);
+  }
+  return forecasts;
 }
 
 // Fire-and-forget: record each source's day+1 prediction into the DB
@@ -264,6 +274,26 @@ router.get('/alerts', async (req: Request, res: Response) => {
   };
   setCached(cacheKey, response);
   return res.json(response);
+});
+
+// POST /api/weather/feedback
+// Body: { city, lat?, lon?, type: FeedbackType }
+router.post('/feedback', async (req: Request, res: Response) => {
+  const { city, lat, lon, type } = req.body ?? {};
+  const valid: FeedbackType[] = ['accurate', 'too_warm', 'too_cold', 'missed_rain', 'false_rain'];
+  if (!city || !type || !valid.includes(type)) {
+    return res.status(400).json({ error: 'city and valid type required' });
+  }
+  await recordFeedback(city, lat ?? null, lon ?? null, type as FeedbackType);
+  return res.json({ ok: true });
+});
+
+// GET /api/weather/feedback-summary?city=Toronto
+router.get('/feedback-summary', async (req: Request, res: Response) => {
+  const city = req.query.city as string;
+  if (!city) return res.status(400).json({ error: 'city query param is required' });
+  const summary = await getFeedbackSummary(city);
+  return res.json({ city, ...summary });
 });
 
 // GET /api/weather/geocode/search?q=Toronto

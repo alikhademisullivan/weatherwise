@@ -16,6 +16,16 @@ WeatherWise pulls forecasts from multiple weather APIs, computes a weighted cons
 - **°C / °F Toggle** — convert at display time; all internals use Celsius
 - **In-memory cache** — 10-minute TTL per city to stay within free-tier rate limits
 - **Graceful degradation** — if one source fails, the others still contribute
+- **Rich stat card tooltips** — hover (desktop) or tap (mobile) on any stat card to see a per-source breakdown with a mini bar chart, identity-coloured bars per source, closest-to-consensus checkmark, outlier warning, trend arrows, and plain-English interpretation
+- **AI weather chat** — ask free-text questions grounded in live consensus + 7-day forecast data; powered by Groq / LLaMA 3.3 70B with multi-turn conversation history
+- **Location feedback** — rate how accurate today's forecast was; aggregated ratings feed back as AI-generated city-specific insights
+- **Browser push notifications** — opt-in alerts for high-confidence rain and disputed forecasts
+- **Share card** — one-tap share (Web Share API with clipboard fallback) that packages current conditions and source agreement into a shareable text snippet
+- **Extended details** — UV index, pressure, visibility, cloud cover, sunrise/sunset with golden hour times; all backed by per-source data
+- **Weather alerts** — severe weather alert banner from NWS/NOAA when available
+- **Honest forecast confidence** — days 1–3 show precise temps; days 4–7 show wider bands because precision that far out is unreliable
+- **Best time widget** — scores every hour 0–100 for outdoor activity (temperature, precipitation, wind, condition) and surfaces the best 2-hour window
+- **City autocomplete** — coordinate-based disambiguation for same-name cities
 
 ---
 
@@ -29,6 +39,8 @@ WeatherWise pulls forecasts from multiple weather APIs, computes a weighted cons
 | Data fetching | TanStack Query (React Query v5) |
 | Routing | React Router v6 |
 | Backend | Node.js + Express, TypeScript |
+| AI | Groq SDK, LLaMA 3.3 70B Versatile |
+| Database | PostgreSQL (optional) |
 | HTTP client | Axios |
 | Cache | node-cache (in-memory) |
 | Dev tooling | tsx, concurrently, Vitest |
@@ -42,20 +54,31 @@ weatherwise/
 ├── client/                        # React + Vite frontend
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── ConsensusCard.tsx   # Hero temp + condition
-│   │   │   ├── ConfidenceBar.tsx   # Agreement meter
-│   │   │   ├── DisputeBadge.tsx    # High uncertainty indicator
-│   │   │   ├── WeatherStats.tsx    # Feels like, humidity, wind, precip
-│   │   │   ├── SourceBreakdown.tsx # Side-by-side source table
-│   │   │   ├── ForecastChart.tsx   # 7-day chart + day strip
-│   │   │   └── SearchBar.tsx       # City search form
+│   │   │   ├── DetailsPanel.tsx        # 9 stat tiles (hero + details modes)
+│   │   │   ├── StatTooltip.tsx         # Portal-based hover/tap tooltip with per-source bar chart
+│   │   │   ├── ConfidenceBar.tsx       # Agreement meter
+│   │   │   ├── DisputeBadge.tsx        # High uncertainty indicator
+│   │   │   ├── SourceBreakdown.tsx     # Per-source temperature table with outlier highlight
+│   │   │   ├── ForecastChart.tsx       # 7-day chart with confidence tiers
+│   │   │   ├── HourlyChart.tsx         # 24-hour forecast strip
+│   │   │   ├── BestTimeWidget.tsx      # Hourly outdoor activity scorer
+│   │   │   ├── AIChatDrawer.tsx        # Bottom-sheet AI chat with conversation history
+│   │   │   ├── LocationFeedback.tsx    # Forecast accuracy ratings + aggregate display
+│   │   │   ├── NotificationOptIn.tsx   # Browser push notification opt-in
+│   │   │   ├── ShareCard.tsx           # Web Share API + clipboard fallback
+│   │   │   ├── AccuracyLeaderboard.tsx # Per-source MAE and weight display
+│   │   │   ├── AirQuality.tsx          # AQI with EPA category colours
+│   │   │   ├── SunArc.tsx              # Sunrise/sunset arc with current time
+│   │   │   ├── SmartSummary.tsx        # Plain-English consensus summary
+│   │   │   ├── AlertsBanner.tsx        # Severe weather alert strip
+│   │   │   └── SearchBar.tsx           # City search with autocomplete
 │   │   ├── hooks/
-│   │   │   └── useWeatherConsensus.ts  # React Query hooks
+│   │   │   └── useWeatherConsensus.ts  # TanStack Query hooks for all endpoints
 │   │   ├── utils/
-│   │   │   └── formatters.ts       # Temp units, dates, emojis
+│   │   │   └── formatters.ts           # Temp units, dates, compass, UV risk
 │   │   ├── types/
-│   │   │   └── weather.ts          # Shared TypeScript interfaces
-│   │   ├── App.tsx                 # Main dashboard
+│   │   │   └── weather.ts              # Shared TypeScript interfaces
+│   │   ├── App.tsx                     # Main dashboard
 │   │   ├── main.tsx
 │   │   └── index.css
 │   ├── index.html
@@ -66,18 +89,23 @@ weatherwise/
 ├── server/                        # Express backend
 │   ├── src/
 │   │   ├── routes/
-│   │   │   └── weather.ts          # GET /api/weather/current|forecast|sources
+│   │   │   ├── weather.ts          # current, forecast, hourly, accuracy, alerts, feedback
+│   │   │   └── ask.ts              # POST /api/weather/ask (AI chat)
 │   │   ├── services/
 │   │   │   ├── openMeteo.ts        # Open-Meteo adapter (no key required)
 │   │   │   ├── openWeatherMap.ts   # OpenWeatherMap adapter
-│   │   │   └── consensus.ts        # Aggregation + dispute logic
-│   │   ├── cache/
-│   │   │   └── weatherCache.ts     # node-cache wrapper
+│   │   │   ├── tomorrowIo.ts       # Tomorrow.io adapter
+│   │   │   ├── weatherApi.ts       # WeatherAPI.com adapter
+│   │   │   ├── consensus.ts        # Weighted average, dispute detection, field spreads
+│   │   │   └── groqDecision.ts     # Groq/LLaMA context builder + chat completion
+│   │   ├── db/
+│   │   │   ├── migrations.ts       # predictions, actuals, accuracy, feedback schema
+│   │   │   ├── accuracy.ts         # MAE calculation and dynamic weight queries
+│   │   │   ├── feedback.ts         # Location feedback storage and aggregation
+│   │   │   └── pool.ts             # PostgreSQL connection pool
 │   │   ├── types/
 │   │   │   └── weather.ts          # Server-side type definitions
-│   │   ├── __tests__/
-│   │   │   └── consensus.test.ts   # Unit tests (Vitest)
-│   │   └── index.ts               # Express app entry point
+│   │   └── index.ts                # Express app entry point
 │   ├── tsconfig.json
 │   └── package.json
 │
@@ -178,11 +206,31 @@ Returns the consensus reading and per-source breakdown for the current condition
 
 ### `GET /api/weather/forecast?city=<city>&days=7`
 
-Returns a merged 7-day forecast with spread bands from all sources.
+Returns a merged 7-day forecast with spread bands from all sources and honest confidence tiers.
 
-### `GET /api/weather/sources?city=<city>`
+### `GET /api/weather/hourly?city=<city>`
 
-Returns raw per-source readings without consensus computation.
+Returns 24-hour hourly forecast (temperature, precipitation probability, wind speed, condition).
+
+### `GET /api/weather/accuracy?city=<city>`
+
+Returns per-source rolling 30-day MAE, accuracy scores (0–100), and current consensus weights.
+
+### `GET /api/weather/alerts?city=<city>`
+
+Returns active severe weather alerts from NWS/NOAA (US cities). Empty array outside the US.
+
+### `GET /api/weather/feedback-summary?city=<city>`
+
+Returns aggregated user feedback totals and an AI-generated insight (once ≥ 5 reports exist).
+
+### `POST /api/weather/feedback`
+
+Body: `{ city, lat, lon, type }` where `type` is one of `accurate | too_warm | too_cold | missed_rain | false_rain`.
+
+### `POST /api/weather/ask`
+
+Body: `{ city, question, history? }`. Returns `{ answer, city, question }`. Requires `GROQ_API_KEY`. History is an array of `{ role: "user" | "assistant", content: string }` capped at 8 entries.
 
 ### `GET /api/health`
 
@@ -284,6 +332,29 @@ cd server && node dist/index.js
 - [x] Accuracy badge shown inline in source breakdown panel
 - [x] Green dot indicator in header when dynamic weights are active
 
+### Phase 4 — Extended Details & Smart UI
+- [x] Extended `SourceReading` and `ConsensusReading` with UV index, pressure, dew point, visibility, wind gust, wind direction, cloud cover, precipitation mm, sunrise/sunset times, moon phase, air quality
+- [x] `fieldSpreads` object on consensus for per-field source disagreement tracking
+- [x] Secondary stats strip (UV, pressure, visibility, cloud cover, sunrise/sunset) with warn indicators
+- [x] Severe weather alerts banner (`GET /api/weather/alerts`) via NWS/NOAA
+- [x] Smart summary sentence derived from consensus + forecast data
+- [x] Sun arc visualisation with current time position and moon phase
+- [x] Air quality card with AQI scale and EPA category colours
+- [x] Best time widget scoring hourly windows 0–100 for outdoor activity
+- [x] Honest forecast confidence tiers — day 1–3 precise, day 4–7 range-only
+- [x] City autocomplete with coordinate-based disambiguation
+- [x] Animated condition backgrounds (clear, rain, snow, thunderstorm, fog, etc.)
+
+### Phase 5 — AI, Feedback & Social
+- [x] Groq/LLaMA 3.3 70B AI chat grounded in live consensus + 7-day forecast
+- [x] Multi-turn conversation history (capped at 8 messages)
+- [x] Suggested prompt chips on first open
+- [x] Location feedback (5 rating types: accurate / too warm / too cold / missed rain / no rain came)
+- [x] Feedback aggregation with bar-chart breakdown and AI-generated city insight (≥ 5 reports)
+- [x] Browser push notifications opt-in — rain alert (≥ 70% precip + ≥ 70 confidence) and dispute alert
+- [x] Share card — Web Share API with clipboard fallback, formats conditions + confidence
+- [x] Rich stat card tooltips (`StatTooltip`) with per-source bar chart, identity colours, outlier detection, trend arrows, portal-based positioning that escapes `overflow: hidden` containers
+
 ---
 
 ## Phase 3 Setup — PostgreSQL
@@ -331,6 +402,21 @@ DATABASE_SSL=true   # required for most hosted providers
 
 ---
 
+## Phase 5 Setup — AI Chat
+
+AI chat is optional. Without `GROQ_API_KEY` the `/api/weather/ask` endpoint returns 503 and the Ask AI button simply shows an error message.
+
+1. Create a free account at [console.groq.com](https://console.groq.com)
+2. Generate an API key
+3. Add to `.env`:
+```bash
+GROQ_API_KEY=your_key_here
+```
+
+The endpoint uses `llama-3.3-70b-versatile` (Groq's free tier). Responses are capped at 300 tokens — 2–4 sentences max. Live weather data is fetched fresh on every question so the AI always has current conditions and the full 7-day forecast as grounded context.
+
+---
+
 ## Environment Variables
 
 | Variable | Default | Description |
@@ -341,8 +427,9 @@ DATABASE_SSL=true   # required for most hosted providers
 | `WEATHERAPI_KEY` | — | WeatherAPI.com key (free tier: 1M calls/month) |
 | `CACHE_TTL_SECONDS` | `600` | Cache lifetime per city in seconds |
 | `DISPUTE_THRESHOLD_CELSIUS` | `3` | Spread (°C) that triggers the dispute badge |
-| `DATABASE_URL` | — | PostgreSQL connection string (Phase 3, optional) |
+| `DATABASE_URL` | — | PostgreSQL connection string (Phase 3+, optional) |
 | `DATABASE_SSL` | — | Set to `true` for hosted Postgres providers |
+| `GROQ_API_KEY` | — | Groq API key for AI chat (Phase 5, optional) |
 
 ---
 

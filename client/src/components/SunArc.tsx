@@ -54,8 +54,8 @@ export default function SunArc({ sunriseTime, sunsetTime, moonPhase }: Props) {
   const dl = dayLength(sunriseTime, sunsetTime);
 
   return (
-    <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-6">
-      <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Sun & Sky</h2>
+    <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-5">
+      <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3">Sun & Sky</h2>
 
       <svg viewBox="0 0 200 95" className="w-full max-w-xs mx-auto block" aria-label="Sun arc">
         {/* Horizon line */}

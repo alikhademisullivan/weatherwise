@@ -27,10 +27,10 @@ function getLevel(epaIdx: number): AqiLevel {
 export default function AirQuality({ aqi, category }: Props) {
   const level = getLevel(aqi);
   return (
-    <div className={`rounded-2xl border border-white/15 backdrop-blur-sm p-6 ${level.bg}`}>
-      <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Air Quality</h2>
+    <div className={`rounded-2xl border border-white/15 backdrop-blur-sm p-5 ${level.bg}`}>
+      <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3">Air Quality</h2>
 
-      <div className="flex items-center gap-3 mb-3">
+      <div className="flex items-center gap-3 mb-2">
         <div className="text-2xl font-bold text-white">{category}</div>
       </div>
 
