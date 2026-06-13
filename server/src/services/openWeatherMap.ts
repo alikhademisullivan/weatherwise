@@ -15,12 +15,21 @@ function owmCodeToCondition(id: number, icon: string): { condition: string; cond
   return { condition: 'Unknown', conditionCode: 'unknown' };
 }
 
-export async function getCurrentWeather(city: string): Promise<SourceReading> {
+function formatSunTime(unixTs: number): string {
+  return new Date(unixTs * 1000).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+export async function getCurrentWeather(city: string, coords?: { lat: number; lon: number }): Promise<SourceReading> {
   const apiKey = process.env.OPENWEATHERMAP_API_KEY;
   if (!apiKey) throw new Error('OPENWEATHERMAP_API_KEY not set');
 
+  const locParam = coords ? { lat: coords.lat, lon: coords.lon } : { q: city };
   const { data } = await axios.get(`${BASE}/weather`, {
-    params: { q: city, appid: apiKey, units: 'metric' },
+    params: { ...locParam, appid: apiKey, units: 'metric' },
   });
 
   const { condition, conditionCode } = owmCodeToCondition(
@@ -28,44 +37,60 @@ export async function getCurrentWeather(city: string): Promise<SourceReading> {
     data.weather[0].icon,
   );
 
+  // Fix: use actual rain data as heuristic instead of cloud coverage
+  const precipMm = data.rain?.['1h'] ?? 0;
+  const precipProb = precipMm > 0 ? 80 : 0;
+
   return {
     source: 'OpenWeatherMap',
     temperature: data.main.temp,
     feelsLike: data.main.feels_like,
     humidity: data.main.humidity,
     windSpeed: data.wind.speed * 3.6,
-    precipitationProbability: data.clouds?.all ?? 0,
+    precipitationProbability: precipProb,
     condition,
     conditionCode,
     fetchedAt: new Date().toISOString(),
+    pressure: data.main.pressure,
+    visibility: data.visibility != null ? parseFloat((data.visibility / 1000).toFixed(1)) : undefined,
+    windDirection: data.wind.deg,
+    windGust: data.wind.gust != null ? parseFloat((data.wind.gust * 3.6).toFixed(1)) : undefined,
+    cloudCover: data.clouds?.all,
+    precipitationMm: precipMm,
+    sunriseTime: data.sys?.sunrise ? formatSunTime(data.sys.sunrise) : undefined,
+    sunsetTime: data.sys?.sunset ? formatSunTime(data.sys.sunset) : undefined,
   };
 }
 
-export async function getForecast(city: string, days: number = 7): Promise<ForecastDay[]> {
+export async function getForecast(city: string, days: number = 7, coords?: { lat: number; lon: number }): Promise<ForecastDay[]> {
   const apiKey = process.env.OPENWEATHERMAP_API_KEY;
   if (!apiKey) throw new Error('OPENWEATHERMAP_API_KEY not set');
 
+  const locParam = coords ? { lat: coords.lat, lon: coords.lon } : { q: city };
   const { data } = await axios.get(`${BASE}/forecast`, {
-    params: { q: city, appid: apiKey, units: 'metric', cnt: days * 8 },
+    params: { ...locParam, appid: apiKey, units: 'metric', cnt: days * 8 },
   });
 
   // OWM returns 3-hour intervals; bucket by date and take daily high/low
-  const byDate: Record<string, { highs: number[]; lows: number[]; pops: number[]; codes: number[]; icons: string[] }> = {};
+  const byDate: Record<string, { highs: number[]; lows: number[]; pops: number[]; codes: number[]; icons: string[]; gusts: number[]; precip: number[] }> = {};
 
   for (const item of data.list) {
     const date = item.dt_txt.split(' ')[0];
-    if (!byDate[date]) byDate[date] = { highs: [], lows: [], pops: [], codes: [], icons: [] };
+    if (!byDate[date]) byDate[date] = { highs: [], lows: [], pops: [], codes: [], icons: [], gusts: [], precip: [] };
     byDate[date].highs.push(item.main.temp_max);
     byDate[date].lows.push(item.main.temp_min);
     byDate[date].pops.push((item.pop ?? 0) * 100);
     byDate[date].codes.push(item.weather[0].id);
     byDate[date].icons.push(item.weather[0].icon);
+    if (item.wind?.gust) byDate[date].gusts.push(item.wind.gust * 3.6);
+    if (item.rain?.['3h']) byDate[date].precip.push(item.rain['3h']);
   }
 
   return Object.entries(byDate)
     .slice(0, days)
     .map(([date, v]) => {
-      const { condition } = owmCodeToCondition(v.codes[Math.floor(v.codes.length / 2)], v.icons[Math.floor(v.icons.length / 2)]);
+      const midIdx = Math.floor(v.codes.length / 2);
+      const { condition, conditionCode } = owmCodeToCondition(v.codes[midIdx], v.icons[midIdx]);
       return {
         date,
         high: Math.max(...v.highs),
@@ -74,7 +99,10 @@ export async function getForecast(city: string, days: number = 7): Promise<Forec
         spreadLow: Math.min(...v.lows),
         precipitationProbability: Math.round(v.pops.reduce((a, b) => a + b, 0) / v.pops.length),
         condition,
+        conditionCode,
         isDisputed: false,
+        windGustMax: v.gusts.length ? parseFloat(Math.max(...v.gusts).toFixed(1)) : undefined,
+        precipMm: v.precip.length ? parseFloat(v.precip.reduce((a, b) => a + b, 0).toFixed(1)) : undefined,
       } satisfies ForecastDay;
     });
 }

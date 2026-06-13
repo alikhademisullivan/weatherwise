@@ -1,125 +1,247 @@
 import { useState } from 'react';
 import SearchBar from './components/SearchBar';
 import ConsensusCard from './components/ConsensusCard';
-import WeatherStats from './components/WeatherStats';
+import DetailsPanel from './components/DetailsPanel';
 import SourceBreakdown from './components/SourceBreakdown';
 import ForecastChart from './components/ForecastChart';
-import { useCurrentWeather, useForecast } from './hooks/useWeatherConsensus';
+import HourlyChart from './components/HourlyChart';
+import AccuracyLeaderboard from './components/AccuracyLeaderboard';
+import AlertsBanner from './components/AlertsBanner';
+import SmartSummary from './components/SmartSummary';
+import SunArc from './components/SunArc';
+import AirQuality from './components/AirQuality';
+import BestTimeWidget from './components/BestTimeWidget';
+import { useCurrentWeather, useForecast, useHourlyForecast, useAccuracy, useAlerts } from './hooks/useWeatherConsensus';
+import { useLocation } from './hooks/useLocation';
+
+type ForecastView = 'daily' | 'hourly';
+
+function conditionBgClass(conditionCode?: string): string {
+  const code = conditionCode ?? 'unknown';
+  const known = [
+    'clear', 'partly_cloudy', 'cloudy', 'fog',
+    'rain', 'drizzle', 'rain_showers',
+    'snow', 'snow_showers', 'thunderstorm',
+  ];
+  return `wx-bg wx-${known.includes(code) ? code : 'unknown'}`;
+}
 
 export default function App() {
   const [city, setCity] = useState('Toronto');
+  const [searchValue, setSearchValue] = useState('Toronto');
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [showSources, setShowSources] = useState(false);
+  const [showAccuracy, setShowAccuracy] = useState(false);
   const [unit, setUnit] = useState<'C' | 'F'>('C');
+  const [forecastView, setForecastView] = useState<ForecastView>('daily');
 
-  const { data: weather, isLoading, isError, error } = useCurrentWeather(city);
-  const { data: forecastData, isLoading: forecastLoading } = useForecast(city);
+  const { data: weather, isLoading, isError, error } = useCurrentWeather(city, coords);
+  const { data: forecastData, isLoading: forecastLoading } = useForecast(city, coords);
+  const { data: hourlyData, isLoading: hourlyLoading } = useHourlyForecast(city, coords);
+  const { data: accuracyData } = useAccuracy(city);
+  const { data: alertsData } = useAlerts(city, coords);
+
+  const { locate, loading: locating, error: geoError } = useLocation(newCity => {
+    setCity(newCity);
+    setSearchValue(newCity);
+    setCoords(null);
+  });
+
+  const conditionCode = weather?.consensus.sources[0]?.conditionCode;
 
   return (
-    <div className="min-h-screen px-4 py-8">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <>
+      {/* Animated background */}
+      <div className={conditionBgClass(conditionCode)} aria-hidden="true" />
 
-        {/* Header */}
-        <div className="text-center space-y-1">
-          <h1 className="text-3xl font-bold text-white tracking-tight">
-            WeatherWise
-          </h1>
-          <p className="text-white/50 text-sm">The weather app that tells you when to trust the forecast</p>
-        </div>
+      <div className="min-h-screen px-4 py-8">
+        <div className="max-w-2xl mx-auto space-y-6">
 
-        {/* Search */}
-        <SearchBar onSearch={setCity} initialValue={city} />
-
-        {/* Controls */}
-        <div className="flex items-center justify-between">
-          <div className="flex gap-1 bg-white/10 rounded-lg p-0.5">
-            {(['C', 'F'] as const).map(u => (
-              <button
-                key={u}
-                onClick={() => setUnit(u)}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                  unit === u ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'
-                }`}
-              >
-                °{u}
-              </button>
-            ))}
+          {/* Header */}
+          <div className="text-center space-y-1">
+            <h1 className="text-3xl font-bold text-white tracking-tight">WeatherWise</h1>
+            <p className="text-white/50 text-sm">The weather app that tells you when to trust the forecast</p>
           </div>
 
-          {weather && (
-            <button
-              onClick={() => setShowSources(v => !v)}
-              className="text-xs text-white/50 hover:text-white/80 transition-colors flex items-center gap-1"
-            >
-              {showSources ? 'Hide' : 'Show'} source breakdown
-              <span className="text-white/30">{showSources ? '▲' : '▼'}</span>
-            </button>
+          {/* Search */}
+          <SearchBar
+            value={searchValue}
+            onValueChange={setSearchValue}
+            onSearch={(cityLabel, c) => { setCity(cityLabel); setCoords(c ?? null); }}
+            onLocate={locate}
+            locating={locating}
+          />
+
+          {geoError && (
+            <p className="text-center text-amber-400/80 text-xs">{geoError}</p>
           )}
-        </div>
 
-        {/* Loading */}
-        {isLoading && (
-          <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-12 text-center">
-            <div className="animate-pulse text-4xl mb-3">🌤️</div>
-            <p className="text-white/60 text-sm">Fetching forecasts from multiple sources…</p>
-          </div>
-        )}
+          {/* Controls */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex gap-1 bg-white/10 rounded-lg p-0.5">
+              {(['C', 'F'] as const).map(u => (
+                <button
+                  key={u}
+                  onClick={() => setUnit(u)}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                    unit === u ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'
+                  }`}
+                >
+                  °{u}
+                </button>
+              ))}
+            </div>
 
-        {/* Error */}
-        {isError && (
-          <div className="rounded-2xl bg-red-500/10 border border-red-400/30 p-6 text-center">
-            <p className="text-red-300 font-medium">Failed to fetch weather</p>
-            <p className="text-red-400/70 text-sm mt-1">
-              {(error as Error)?.message ?? 'Check your connection or try another city.'}
-            </p>
-          </div>
-        )}
+            {weather && (
+              <div className="flex items-center gap-3">
+                <div className="flex gap-1 bg-white/10 rounded-lg p-0.5">
+                  {(['daily', 'hourly'] as const).map(v => (
+                    <button
+                      key={v}
+                      onClick={() => setForecastView(v)}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-colors capitalize ${
+                        forecastView === v ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
 
-        {/* Main content */}
-        {weather && !isLoading && (
-          <>
-            <ConsensusCard
-              consensus={weather.consensus}
-              location={weather.location}
-              unit={unit}
-            />
+                <button
+                  onClick={() => setShowSources(v => !v)}
+                  className="text-xs text-white/50 hover:text-white/80 transition-colors flex items-center gap-1"
+                >
+                  {showSources ? 'Hide' : 'Show'} sources
+                  <span className="text-white/30">{showSources ? '▲' : '▼'}</span>
+                </button>
 
-            <WeatherStats consensus={weather.consensus} unit={unit} />
-
-            {showSources && (
-              <SourceBreakdown
-                sources={weather.sources}
-                consensus={weather.consensus}
-                unit={unit}
-              />
-            )}
-
-            {forecastData && !forecastLoading && (
-              <ForecastChart forecast={forecastData.forecast} unit={unit} />
-            )}
-
-            {forecastLoading && (
-              <div className="rounded-2xl bg-white/5 border border-white/10 p-6 text-center text-white/40 text-sm animate-pulse">
-                Loading 7-day forecast…
+                <button
+                  onClick={() => setShowAccuracy(v => !v)}
+                  className="text-xs text-white/50 hover:text-white/80 transition-colors flex items-center gap-1"
+                >
+                  Accuracy
+                  {accuracyData?.usingDynamicWeights && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block ml-0.5" title="Dynamic weights active" />
+                  )}
+                  <span className="text-white/30">{showAccuracy ? '▲' : '▼'}</span>
+                </button>
               </div>
             )}
-
-            {/* Footer meta */}
-            <p className="text-center text-white/30 text-xs">
-              Last updated: {new Date(weather.updatedAt).toLocaleTimeString()}
-              {weather.cached && ' · cached'}
-              {' · '}{weather.sources.length} source{weather.sources.length !== 1 ? 's' : ''}
-            </p>
-          </>
-        )}
-
-        {/* Empty state */}
-        {!weather && !isLoading && !isError && (
-          <div className="rounded-2xl bg-white/5 border border-white/10 p-12 text-center">
-            <div className="text-5xl mb-3">🌍</div>
-            <p className="text-white/50">Search for a city to get started</p>
           </div>
-        )}
+
+          {/* Loading */}
+          {isLoading && (
+            <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-12 text-center">
+              <div className="animate-pulse text-4xl mb-3">🌤️</div>
+              <p className="text-white/60 text-sm">Fetching forecasts from multiple sources…</p>
+            </div>
+          )}
+
+          {/* Error */}
+          {isError && (
+            <div className="rounded-2xl bg-red-500/10 border border-red-400/30 p-6 text-center">
+              <p className="text-red-300 font-medium">Failed to fetch weather</p>
+              <p className="text-red-400/70 text-sm mt-1">
+                {(error as Error)?.message ?? 'Check your connection or try another city.'}
+              </p>
+            </div>
+          )}
+
+          {/* Main content */}
+          {weather && !isLoading && (
+            <>
+              {/* Severe weather alerts */}
+              {alertsData && alertsData.alerts.length > 0 && (
+                <AlertsBanner alerts={alertsData.alerts} />
+              )}
+
+              {/* Smart summary */}
+              <SmartSummary
+                consensus={weather.consensus}
+                forecast={forecastData?.forecast}
+              />
+
+              <ConsensusCard consensus={weather.consensus} location={weather.location} unit={unit} />
+
+              <DetailsPanel consensus={weather.consensus} unit={unit} />
+
+              {/* Sun arc — shown when sunrise/sunset data is available */}
+              {weather.consensus.sunriseTime && weather.consensus.sunsetTime && (
+                <SunArc
+                  sunriseTime={weather.consensus.sunriseTime}
+                  sunsetTime={weather.consensus.sunsetTime}
+                  moonPhase={weather.consensus.moonPhase}
+                />
+              )}
+
+              {/* Air quality — shown when WeatherAPI provides AQI */}
+              {weather.consensus.airQualityIndex != null && weather.consensus.airQualityCategory && (
+                <AirQuality
+                  aqi={weather.consensus.airQualityIndex}
+                  category={weather.consensus.airQualityCategory}
+                />
+              )}
+
+              {showSources && (
+                <SourceBreakdown
+                  sources={weather.sources}
+                  consensus={weather.consensus}
+                  accuracy={accuracyData?.sources ?? []}
+                  unit={unit}
+                />
+              )}
+
+              {showAccuracy && accuracyData && (
+                <AccuracyLeaderboard accuracy={accuracyData} />
+              )}
+
+              {forecastView === 'daily' && (
+                <>
+                  {forecastData && !forecastLoading && (
+                    <ForecastChart forecast={forecastData.forecast} unit={unit} />
+                  )}
+                  {forecastLoading && <ForecastSkeleton label="7-day forecast" />}
+                </>
+              )}
+
+              {forecastView === 'hourly' && (
+                <>
+                  {hourlyData && !hourlyLoading && (
+                    <>
+                      <HourlyChart hours={hourlyData.hours} unit={unit} />
+                      <BestTimeWidget hours={hourlyData.hours} />
+                    </>
+                  )}
+                  {hourlyLoading && <ForecastSkeleton label="hourly forecast" />}
+                </>
+              )}
+
+              <p className="text-center text-white/30 text-xs pb-4">
+                Last updated: {new Date(weather.updatedAt).toLocaleTimeString()}
+                {weather.cached && ' · cached'}
+                {' · '}{weather.sources.length} source{weather.sources.length !== 1 ? 's' : ''}
+                {accuracyData?.usingDynamicWeights && ' · dynamic weights'}
+              </p>
+            </>
+          )}
+
+          {!weather && !isLoading && !isError && (
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-12 text-center">
+              <div className="text-5xl mb-3">🌍</div>
+              <p className="text-white/50">Search for a city to get started</p>
+            </div>
+          )}
+        </div>
       </div>
+    </>
+  );
+}
+
+function ForecastSkeleton({ label }: { label: string }) {
+  return (
+    <div className="rounded-2xl bg-white/5 border border-white/10 p-6 text-center text-white/40 text-sm animate-pulse">
+      Loading {label}…
     </div>
   );
 }
