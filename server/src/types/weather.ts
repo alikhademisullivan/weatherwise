@@ -78,6 +78,11 @@ export interface ForecastDay {
   sunsetTime?: string;
   snowfallMm?: number;
   conditionCode?: string;
+  // Honest forecast confidence (Feature 4)
+  confidenceTier?: 'high' | 'medium' | 'low';
+  tempRangeLow?: number;
+  tempRangeHigh?: number;
+  trend?: string;
 }
 
 export interface WeatherResponse {

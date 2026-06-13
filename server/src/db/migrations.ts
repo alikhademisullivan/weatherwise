@@ -1,6 +1,18 @@
 import { query, dbEnabled } from './pool';
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS location_feedback (
+  id            SERIAL PRIMARY KEY,
+  city          VARCHAR(200)   NOT NULL,
+  latitude      NUMERIC(9,6),
+  longitude     NUMERIC(9,6),
+  feedback_type VARCHAR(50)    NOT NULL,
+  created_at    TIMESTAMPTZ    NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_city
+  ON location_feedback (city, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS predictions (
   id          SERIAL PRIMARY KEY,
   source      VARCHAR(100)   NOT NULL,

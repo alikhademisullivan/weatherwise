@@ -23,8 +23,8 @@ export default function SourceBreakdown({ sources, consensus, accuracy, unit }: 
   const accuracyBySource = Object.fromEntries(accuracy.map(a => [a.source, a]));
 
   return (
-    <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-6">
-      <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Source Breakdown</h2>
+    <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-5">
+      <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3">Source Breakdown</h2>
       <div className="space-y-3">
         {sources.map((s, i) => {
           const diff = parseFloat((s.temperature - consensus.temperature).toFixed(1));

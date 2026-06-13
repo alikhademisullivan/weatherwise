@@ -120,9 +120,10 @@ export function mergeForecastDays(perSourceForecasts: ForecastDay[][]): Forecast
     }
   }
 
-  return Object.entries(byDate)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, days]) => {
+  const sortedDates = Object.keys(byDate).sort();
+
+  return sortedDates.map((date, dayIndex) => {
+      const days = byDate[date];
       const highs = days.map(d => d.high);
       const lows = days.map(d => d.low);
       const spread = Math.max(...highs) - Math.min(...lows);
@@ -145,6 +146,29 @@ export function mergeForecastDays(perSourceForecasts: ForecastDay[][]): Forecast
       const sunsetTime = days.find(d => d.sunsetTime)?.sunsetTime;
       const conditionCode = days.find(d => d.conditionCode)?.conditionCode;
 
+      // Honest confidence tier based on forecast horizon
+      const confidenceTier: 'high' | 'medium' | 'low' =
+        dayIndex < 3 ? 'high' : dayIndex < 6 ? 'medium' : 'low';
+
+      const tempRangeLow = dayIndex >= 3 ? parseFloat(Math.min(...lows).toFixed(0)) : undefined;
+      const tempRangeHigh = dayIndex >= 3 ? parseFloat(Math.max(...highs).toFixed(0)) : undefined;
+
+      // Trend text for low-confidence days (day 7+)
+      let trend: string | undefined;
+      if (dayIndex >= 6) {
+        const highRain = avgPrecip >= 50;
+        const someRain = avgPrecip >= 25;
+        const isWarm = avgHigh >= 25;
+        const isCold = avgHigh <= 10;
+        const parts: string[] = [];
+        if (isWarm) parts.push('Warmer than average');
+        else if (isCold) parts.push('Cooler than average');
+        else parts.push('Near-average temps');
+        if (highRain) parts.push('rain likely');
+        else if (someRain) parts.push('some rain possible');
+        trend = parts.join(', ');
+      }
+
       return {
         date,
         high: parseFloat(avgHigh.toFixed(1)),
@@ -161,6 +185,10 @@ export function mergeForecastDays(perSourceForecasts: ForecastDay[][]): Forecast
         snowfallMm: snowVals.length ? parseFloat(snowVals.reduce((a, b) => a + b, 0).toFixed(1)) : undefined,
         sunriseTime,
         sunsetTime,
+        confidenceTier,
+        tempRangeLow,
+        tempRangeHigh,
+        trend,
       } satisfies ForecastDay;
     });
 }

@@ -78,6 +78,23 @@ export interface ForecastDay {
   sunsetTime?: string;
   snowfallMm?: number;
   conditionCode?: string;
+  // Honest forecast confidence (Feature 4)
+  confidenceTier?: 'high' | 'medium' | 'low';
+  tempRangeLow?: number;
+  tempRangeHigh?: number;
+  trend?: string;
+}
+
+export type FeedbackType = 'accurate' | 'too_warm' | 'too_cold' | 'missed_rain' | 'false_rain';
+
+export interface FeedbackSummary {
+  total: number;
+  accurate: number;
+  too_warm: number;
+  too_cold: number;
+  missed_rain: number;
+  false_rain: number;
+  insight: string | null;
 }
 
 export interface WeatherResponse {

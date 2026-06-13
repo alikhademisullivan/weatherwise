@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import weatherRouter from './routes/weather';
+import askRouter from './routes/ask';
 import { runMigrations } from './db/migrations';
 import { scheduleAccuracyCron } from './jobs/accuracyCron';
 
@@ -12,6 +14,13 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/weather', weatherRouter);
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'Too many requests, slow down.' },
+});
+app.use('/api/weather/ask', aiLimiter, askRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
