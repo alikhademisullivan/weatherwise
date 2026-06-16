@@ -1,3 +1,4 @@
+import { useRef, useEffect, useState } from 'react';
 import { dayLength } from '../utils/formatters';
 
 interface Props {
@@ -6,95 +7,150 @@ interface Props {
   moonPhase?: string;
 }
 
-function parseTimeStr(s: string): Date | null {
-  const d = new Date(`1970-01-01 ${s}`);
-  return isNaN(d.getTime()) ? null : d;
+function toMinutes(s: string): number {
+  const clean = s.trim();
+  const ampm = /([ap]m)/i.exec(clean);
+  const parts = clean.replace(/\s*(am|pm)/i, '').split(':');
+  let h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1] ?? '0', 10);
+  if (ampm) {
+    const period = ampm[1].toLowerCase();
+    if (period === 'pm' && h !== 12) h += 12;
+    if (period === 'am' && h === 12) h = 0;
+  }
+  return h * 60 + m;
+}
+
+// Arc endpoints sit at y=90 inside a 400×120 viewBox.
+// Control point at (200,15) gives a tall, full-height curve.
+const P0 = { x: 20,  y: 90 };
+const P1 = { x: 200, y: 15 };
+const P2 = { x: 380, y: 90 };
+const ARC_D = `M ${P0.x} ${P0.y} Q ${P1.x} ${P1.y} ${P2.x} ${P2.y}`;
+
+function bezier(t: number) {
+  const mt = 1 - t;
+  return {
+    x: mt * mt * P0.x + 2 * mt * t * P1.x + t * t * P2.x,
+    y: mt * mt * P0.y + 2 * mt * t * P1.y + t * t * P2.y,
+  };
 }
 
 export default function SunArc({ sunriseTime, sunsetTime, moonPhase }: Props) {
-  const rise = parseTimeStr(sunriseTime);
-  const set = parseTimeStr(sunsetTime);
-  if (!rise || !set) return null;
+  const pathRef = useRef<SVGPathElement>(null);
+  const [totalLength, setTotalLength] = useState(0);
 
-  const now = new Date();
-  const nowProxy = new Date(`1970-01-01 ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
+  useEffect(() => {
+    if (pathRef.current) setTotalLength(pathRef.current.getTotalLength());
+  }, []);
 
-  // 0–1 position of sun along the arc
-  const total = set.getTime() - rise.getTime();
-  const elapsed = nowProxy.getTime() - rise.getTime();
-  const pos = Math.max(0, Math.min(1, total > 0 ? elapsed / total : 0));
-  const isDaytime = pos >= 0 && pos <= 1 && elapsed >= 0;
+  const sunriseMin = toMinutes(sunriseTime);
+  const sunsetMin  = toMinutes(sunsetTime);
+  const now        = new Date();
+  const nowMin     = now.getHours() * 60 + now.getMinutes();
 
-  // SVG semi-circle: center (100, 80), radius 70
-  const cx = 100;
-  const cy = 80;
-  const r = 70;
+  const daySpan     = sunsetMin - sunriseMin;
+  const rawProgress = daySpan > 0 ? (nowMin - sunriseMin) / daySpan : 0;
+  const isDaytime   = rawProgress >= 0 && rawProgress <= 1;
+  const clamped     = Math.max(0, Math.min(1, rawProgress));
 
-  // angle 0 = left (sunrise), π = right (sunset), sun travels clockwise top arc
-  function arcPoint(t: number) {
-    const angle = Math.PI - t * Math.PI; // π → 0
-    return {
-      x: cx + r * Math.cos(angle),
-      y: cy - r * Math.sin(angle),
-    };
-  }
-
-  const sunPt = arcPoint(pos);
-
-  // Golden hour bands: 30 min = 30/(total/60000) fraction of arc
-  const goldenFrac = Math.min(0.15, total > 0 ? (30 * 60000) / total : 0.1);
-
-  function arcD(t0: number, t1: number) {
-    const p0 = arcPoint(t0);
-    const p1 = arcPoint(t1);
-    const large = t1 - t0 > 0.5 ? 1 : 0;
-    return `M ${p0.x} ${p0.y} A ${r} ${r} 0 ${large} 0 ${p1.x} ${p1.y}`;
-  }
+  const sunPt  = bezier(clamped);
+  const elapsed = totalLength * clamped;
 
   const dl = dayLength(sunriseTime, sunsetTime);
 
+  // Moon position — based on actual progress through the overnight window,
+  // not just clamped daytime progress. Total night = time from sunset to next sunrise.
+  const nightDuration = (1440 - sunsetMin) + sunriseMin; // e.g. 180 + 335 = 515 min
+  let moonX: number;
+  let moonY: number;
+  if (rawProgress < 0) {
+    // Pre-dawn: nowMin is between 0 and sunriseMin.
+    // nightProgress 0 = just-after-sunset, 1 = about-to-rise.
+    const nightProgress = (1440 - sunsetMin + nowMin) / nightDuration;
+    moonX = P0.x - 40 + 40 * nightProgress;  // slides from far-left toward sunrise
+    moonY = P0.y - 15 * Math.sin(nightProgress * Math.PI);
+  } else {
+    // Post-sunset: nowMin is between sunsetMin and 1440.
+    const nightProgress = (nowMin - sunsetMin) / nightDuration;
+    moonX = P2.x + 40 * nightProgress;       // moves right away from sunset
+    moonY = P2.y - 15 * Math.sin((1 - nightProgress) * Math.PI);
+  }
+  moonX = Math.max(-5, Math.min(405, moonX));
+  moonY = Math.max(P1.y, Math.min(P0.y + 20, moonY));
+
   return (
-    <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-5">
-      <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3">Sun & Sky</h2>
+    <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm px-5 pt-3 pb-2">
+      <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-1">Sun &amp; Sky</h2>
 
-      <svg viewBox="0 0 200 95" className="w-full max-w-xs mx-auto block" aria-label="Sun arc">
+      <svg viewBox="0 0 400 120" className="w-full" style={{ height: 108 }} overflow="visible" aria-label="Sun arc">
+
+        {/* Hidden path — used only to read getTotalLength() */}
+        <path ref={pathRef} d={ARC_D} fill="none" stroke="none" />
+
+        {/* Layer 1: full arc, dashed dim — the "remaining / night" portion */}
+        <path
+          d={ARC_D}
+          fill="none"
+          stroke="rgba(255,255,255,0.2)"
+          strokeWidth="2"
+          strokeDasharray="4 4"
+        />
+
+        {/* Layer 2: elapsed arc, solid gold — drawn on top from sunrise to now */}
+        {totalLength > 0 && elapsed > 0 && (
+          <path
+            d={ARC_D}
+            fill="none"
+            stroke="rgba(251,191,36,0.85)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeDasharray={`${elapsed} ${totalLength - elapsed}`}
+            strokeDashoffset="0"
+          />
+        )}
+
         {/* Horizon line */}
-        <line x1={cx - r} y1={cy} x2={cx + r} y2={cy} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+        <line
+          x1={P0.x} y1={P0.y}
+          x2={P2.x} y2={P2.y}
+          stroke="rgba(255,255,255,0.15)"
+          strokeWidth="1"
+        />
 
-        {/* Full arc (dim) */}
-        <path d={arcD(0, 1)} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="2" />
-
-        {/* Golden hour bands */}
-        <path d={arcD(0, goldenFrac)} fill="none" stroke="rgba(251,191,36,0.5)" strokeWidth="4" strokeLinecap="round" />
-        <path d={arcD(1 - goldenFrac, 1)} fill="none" stroke="rgba(251,146,60,0.5)" strokeWidth="4" strokeLinecap="round" />
-
-        {/* Elapsed arc */}
-        {isDaytime && pos > 0 && (
-          <path d={arcD(0, pos)} fill="none" stroke="rgba(253,224,71,0.7)" strokeWidth="2" />
+        {/* Sun (daytime) */}
+        {isDaytime && (
+          <text x={sunPt.x} y={sunPt.y + 7} textAnchor="middle" fontSize="18">
+            ☀️
+          </text>
         )}
 
-        {/* Sun dot */}
-        {isDaytime ? (
-          <circle cx={sunPt.x} cy={sunPt.y} r="6" fill="#fde047" className="drop-shadow-lg">
-            <animate attributeName="r" values="5.5;6.5;5.5" dur="3s" repeatCount="indefinite" />
-          </circle>
-        ) : (
-          // Night: show moon at the appropriate end
-          <text x={elapsed < 0 ? cx - r - 4 : cx + r + 4} y={cy + 4} fontSize="12" textAnchor="middle">🌙</text>
+        {/* Moon (nighttime) — position computed from overnight progress above */}
+        {!isDaytime && (
+          <text x={moonX} y={moonY + 7} textAnchor="middle" fontSize="15">
+            🌙
+          </text>
         )}
 
-        {/* Sunrise label */}
-        <text x={cx - r} y={cy + 14} fontSize="8" fill="rgba(255,255,255,0.5)" textAnchor="middle">{sunriseTime}</text>
-        {/* Sunset label */}
-        <text x={cx + r} y={cy + 14} fontSize="8" fill="rgba(255,255,255,0.5)" textAnchor="middle">{sunsetTime}</text>
+        {/* Sunrise / sunset labels */}
+        <text x={P0.x} y={P0.y + 16} fill="rgba(255,255,255,0.55)" fontSize="11" textAnchor="middle">
+          {sunriseTime}
+        </text>
+        <text x={P2.x} y={P2.y + 16} fill="rgba(255,255,255,0.55)" fontSize="11" textAnchor="middle">
+          {sunsetTime}
+        </text>
+
+        {/* Daylight duration */}
+        {dl && (
+          <text x="200" y={P0.y + 28} fill="rgba(255,255,255,0.35)" fontSize="10" textAnchor="middle">
+            {dl}
+          </text>
+        )}
       </svg>
 
-      <div className="text-center mt-2 space-y-1">
-        {dl && <p className="text-white/50 text-xs">{dl}</p>}
-        {moonPhase && (
-          <p className="text-white/40 text-xs">🌙 {moonPhase}</p>
-        )}
-      </div>
+      {moonPhase && (
+        <p className="text-center text-white/40 text-xs mt-0.5">🌙 {moonPhase}</p>
+      )}
     </div>
   );
 }

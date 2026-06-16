@@ -14,13 +14,16 @@ interface Props {
   onSearch: (city: string, coords?: { lat: number; lon: number }) => void;
   onLocate: () => void;
   locating: boolean;
+  inputRef?: React.RefObject<HTMLInputElement>;
 }
 
-export default function SearchBar({ value, onValueChange, onSearch, onLocate, locating }: Props) {
+export default function SearchBar({ value, onValueChange, onSearch, onLocate, locating, inputRef }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const internalInputRef = useRef<HTMLInputElement>(null);
+  const resolvedInputRef = inputRef ?? internalInputRef;
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -74,6 +77,7 @@ export default function SearchBar({ value, onValueChange, onSearch, onLocate, lo
     <div ref={wrapperRef} className="relative w-full max-w-xl mx-auto">
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input
+          ref={resolvedInputRef}
           type="text"
           value={value}
           onChange={e => handleChange(e.target.value)}

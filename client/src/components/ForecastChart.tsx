@@ -15,6 +15,7 @@ import { formatDate, celsiusToFahrenheit, conditionCodeToEmoji } from '../utils/
 interface Props {
   forecast: ForecastDay[];
   unit: 'C' | 'F';
+  days?: number;
 }
 
 function CustomTooltip({ active, payload }: { active?: boolean; payload?: any[] }) {
@@ -64,10 +65,10 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: any[] 
 const TIER_LEGEND = [
   { tier: 'high', label: 'Days 1–3: High confidence', color: 'bg-emerald-400' },
   { tier: 'medium', label: 'Days 4–6: Range shown', color: 'bg-yellow-400' },
-  { tier: 'low', label: 'Days 7+: Trend only', color: 'bg-red-400/60' },
+  { tier: 'low', label: 'Days 7–14: Trend only', color: 'bg-red-400/60' },
 ];
 
-export default function ForecastChart({ forecast, unit }: Props) {
+export default function ForecastChart({ forecast, unit, days }: Props) {
   const convert = (v: number) => unit === 'F' ? celsiusToFahrenheit(v) : v;
 
   const data = forecast.map(d => ({
@@ -101,7 +102,7 @@ export default function ForecastChart({ forecast, unit }: Props) {
   return (
     <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-6 space-y-5">
       <div className="flex items-start justify-between gap-2">
-        <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">7-Day Forecast</h2>
+        <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">{days ?? 7}-Day Forecast</h2>
         <div className="flex flex-wrap gap-x-3 gap-y-1 justify-end">
           {TIER_LEGEND.map(t => (
             <span key={t.tier} className="flex items-center gap-1 text-xs text-white/40">
@@ -113,7 +114,10 @@ export default function ForecastChart({ forecast, unit }: Props) {
       </div>
 
       {/* Day strip — different display by tier */}
-      <div className="grid grid-cols-7 gap-1">
+      <div
+        className="grid gap-1"
+        style={{ gridTemplateColumns: `repeat(${Math.min(forecast.length, 14)}, minmax(0, 1fr))` }}
+      >
         {forecast.map(d => {
           const tier = d.confidenceTier ?? 'high';
           const hi = Math.round(convert(d.high));

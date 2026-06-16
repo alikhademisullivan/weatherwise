@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import type { WeatherResponse, ForecastResponse, HourlyForecastResponse, AccuracyResponse, AlertsResponse, FeedbackSummary } from '../types/weather';
+import type { WeatherResponse, ForecastResponse, HourlyForecastResponse, AccuracyResponse, AlertsResponse, FeedbackSummary, HistoricalResponse, PrecipTimelineResponse } from '../types/weather';
 
 type Coords = { lat: number; lon: number } | null | undefined;
 
@@ -51,6 +51,20 @@ export function useHourlyForecast(city: string, coords?: Coords) {
   });
 }
 
+export function useExtendedHourly(city: string, coords?: Coords, days = 7) {
+  return useQuery<HourlyForecastResponse>({
+    queryKey: ['weather', 'hourly-extended', city, coords?.lat, coords?.lon, days],
+    queryFn: async () => {
+      const { data } = await axios.get<HourlyForecastResponse>('/api/weather/hourly', {
+        params: { city, days, ...coordsParams(coords) },
+      });
+      return data;
+    },
+    enabled: city.trim().length > 0,
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
 export function useAccuracy(city: string) {
   return useQuery<AccuracyResponse>({
     queryKey: ['weather', 'accuracy', city],
@@ -88,5 +102,34 @@ export function useFeedbackSummary(city: string) {
     },
     enabled: city.trim().length > 0,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useHistorical(city: string, coords?: Coords) {
+  return useQuery<HistoricalResponse>({
+    queryKey: ['weather', 'historical', city, coords?.lat, coords?.lon],
+    queryFn: async () => {
+      const { data } = await axios.get<HistoricalResponse>('/api/weather/historical', {
+        params: { city, ...coordsParams(coords) },
+      });
+      return data;
+    },
+    enabled: city.trim().length > 0,
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function usePrecipTimeline(city: string, coords?: Coords) {
+  return useQuery<PrecipTimelineResponse>({
+    queryKey: ['weather', 'precip-timeline', city, coords?.lat, coords?.lon],
+    queryFn: async () => {
+      const { data } = await axios.get<PrecipTimelineResponse>('/api/weather/precipitation-timeline', {
+        params: { city, ...coordsParams(coords) },
+      });
+      return data;
+    },
+    enabled: city.trim().length > 0,
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
   });
 }

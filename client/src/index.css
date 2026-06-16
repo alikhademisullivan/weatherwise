@@ -95,3 +95,74 @@
 .scrollbar-thin::-webkit-scrollbar { height: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* ── Light Mode ── */
+html.light body {
+  color: rgba(15, 23, 42, 0.87);
+}
+
+html.light .wx-bg {
+  filter: saturate(0.35) brightness(2.6) !important;
+  animation: none !important;
+  opacity: 0.45;
+}
+
+/* Glass panels */
+html.light [class*="bg-white/"] {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+}
+html.light [class*="bg-black/"] {
+  background-color: rgba(255, 255, 255, 0.84) !important;
+}
+
+/* Text — map white opacity to matching dark opacity */
+html.light [class*="text-white"] {
+  color: rgba(15, 23, 42, 0.82) !important;
+}
+
+/* Borders */
+html.light [class*="border-white/"] {
+  border-color: rgba(0, 0, 0, 0.09) !important;
+}
+
+/* Inputs */
+html.light input[class*="bg-white/"] {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  color: rgba(15, 23, 42, 0.85) !important;
+  border-color: rgba(0, 0, 0, 0.14) !important;
+}
+html.light input::placeholder {
+  color: rgba(15, 23, 42, 0.30) !important;
+}
+
+/* Autocomplete dropdown */
+html.light .bg-gray-900\/95 {
+  background-color: rgba(255, 255, 255, 0.97) !important;
+}
+html.light .text-white:not([class*="bg-blue"]):not([class*="bg-emerald"]) {
+  color: rgba(15, 23, 42, 0.80) !important;
+}
+
+/* Keep coloured status badges, buttons, and charts readable */
+html.light .bg-blue-500,
+html.light .bg-blue-600,
+html.light .bg-emerald-400,
+html.light .bg-red-500,
+html.light .bg-amber-400 {
+  opacity: 1;
+}
+html.light .text-emerald-400,
+html.light .text-amber-300,
+html.light .text-amber-400,
+html.light .text-blue-300,
+html.light .text-cyan-300,
+html.light .text-red-300,
+html.light .text-yellow-300 {
+  /* keep coloured text — only override pure white */
+  color: inherit;
+}
+
+/* Theme transition */
+*, *::before, *::after {
+  transition: background-color 0.25s ease, color 0.15s ease, border-color 0.15s ease;
+}

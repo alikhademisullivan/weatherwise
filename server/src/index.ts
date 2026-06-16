@@ -6,6 +6,7 @@ import weatherRouter from './routes/weather';
 import askRouter from './routes/ask';
 import { runMigrations } from './db/migrations';
 import { scheduleAccuracyCron } from './jobs/accuracyCron';
+import { scheduleDigestCron } from './jobs/digestCron';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -29,6 +30,7 @@ app.get('/api/health', (_req, res) => {
 async function start() {
   await runMigrations();
   scheduleAccuracyCron();
+  scheduleDigestCron();
 
   app.listen(PORT, () => {
     console.log(`WeatherWise server running on http://localhost:${PORT}`);

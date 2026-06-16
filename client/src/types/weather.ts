@@ -158,3 +158,33 @@ export interface AlertsResponse {
   alerts: WeatherAlert[];
   updatedAt: string;
 }
+
+export interface HistoricalDay {
+  high: number;
+  low: number;
+  condition: string;
+}
+
+export interface HistoricalResponse {
+  city: string;
+  yesterdayDate: string;
+  lastYearDate: string;
+  yesterday: HistoricalDay | null;
+  lastYear: HistoricalDay | null;
+  updatedAt: string;
+  cached?: boolean;
+}
+
+export interface PrecipMinute {
+  time: string;
+  precipProbability: number;
+  precipIntensity: number;
+}
+
+export interface PrecipTimelineResponse {
+  city: string;
+  minutes: PrecipMinute[];
+  source: string;
+  updatedAt: string;
+  cached?: boolean;
+}
