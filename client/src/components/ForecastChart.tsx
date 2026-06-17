@@ -24,7 +24,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: any[] 
   const tier = d.confidenceTier ?? 'high';
 
   return (
-    <div className="bg-slate-800/95 border border-white/15 rounded-xl px-4 py-3 text-sm shadow-xl">
+    <div className="bg-slate-800/95 border border-white/15 rounded-xl px-3 py-2.5 text-xs shadow-xl max-w-[200px]">
       <p className="font-semibold text-white mb-1">{formatDate(d.date)}</p>
 
       {tier === 'high' && (
@@ -164,7 +164,7 @@ export default function ForecastChart({ forecast, unit, days }: Props) {
               )}
 
               {tier === 'low' && (
-                <span className="text-xs text-red-400/50 text-center leading-tight">{d.trend?.split(',')[0] ?? '?'}</span>
+                <span className="text-xs text-red-400/50 text-center leading-tight w-full truncate px-0.5">{d.trend?.split(',')[0] ?? '?'}</span>
               )}
 
               {d.isDisputed && tier === 'high' && (

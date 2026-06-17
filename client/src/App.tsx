@@ -384,7 +384,7 @@ export default function App() {
       <OfflineBanner isOffline={isOffline} />
 
       {/* ─── MAIN CONTENT ─── */}
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 pt-3 sm:pt-4 pb-28 sm:pb-24">
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 pt-3 sm:pt-4 pb-36 sm:pb-24">
 
         {isLoading && (
           <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-12 text-center">
