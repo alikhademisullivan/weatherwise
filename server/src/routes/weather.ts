@@ -422,11 +422,32 @@ router.post('/ai-feedback', (req: Request, res: Response) => {
   return res.json({ ok: true });
 });
 
+// POST /api/weather/user-feedback
+// Body: { rating, category, comment?, email? }
+router.post('/user-feedback', async (req: Request, res: Response) => {
+  const { rating, category, comment, email } = req.body ?? {};
+  const validCategories = ['bug', 'feature', 'general', 'compliment'];
+  if (!rating || rating < 1 || rating > 5 || !category || !validCategories.includes(category)) {
+    return res.status(400).json({ error: 'rating (1–5) and valid category required' });
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'invalid email' });
+  }
+  try {
+    const { recordUserFeedback } = await import('../db/userFeedback');
+    await recordUserFeedback({ rating, category, comment: comment?.slice(0, 2000) ?? null, email: email?.trim().toLowerCase() ?? null });
+    return res.json({ ok: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/weather/digest/subscribe
 // Body: { email, city }
 router.post('/digest/subscribe', async (req: Request, res: Response) => {
   const { email, city } = req.body ?? {};
   if (!email || !city) return res.status(400).json({ error: 'email and city required' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'invalid email' });
   try {
     const { addSubscriber } = await import('../services/emailDigest');
     await addSubscriber(email.trim().toLowerCase(), city.trim());

@@ -47,9 +47,6 @@ export default function AccuracyLeaderboard({ accuracy }: Props) {
             WeatherWise stores every forecast and compares it to what actually happened.
             Check back in 24–48 hours — your local scorecard will appear here.
           </p>
-          <div className="mt-4 flex justify-center gap-6 text-white/20 text-xs">
-            <span>Requires DATABASE_URL</span>
-          </div>
         </div>
       </div>
     );

@@ -26,8 +26,10 @@ interface GeoResult {
 }
 
 async function geocode(city: string): Promise<GeoResult> {
+  // Open-Meteo geocoding only understands plain city names, not "City, Region, Country" labels
+  const name = city.split(',')[0].trim();
   const { data } = await axios.get('https://geocoding-api.open-meteo.com/v1/search', {
-    params: { name: city, count: 1, language: 'en', format: 'json' },
+    params: { name, count: 1, language: 'en', format: 'json' },
   });
   if (!data.results?.length) throw new Error(`City not found: ${city}`);
   return data.results[0];
@@ -171,6 +173,7 @@ export async function getHourlyForecast(city: string, coords?: { lat: number; lo
       hourly: [
         'temperature_2m',
         'precipitation_probability',
+        'precipitation',
         'wind_speed_10m',
         'weather_code',
       ].join(','),
@@ -190,6 +193,7 @@ export async function getHourlyForecast(city: string, coords?: { lat: number; lo
         time,
         temperature: h.temperature_2m[i],
         precipitationProbability: h.precipitation_probability[i] ?? 0,
+        precipitationMm: h.precipitation[i] ?? 0,
         windSpeed: h.wind_speed_10m[i],
         condition,
         conditionCode,

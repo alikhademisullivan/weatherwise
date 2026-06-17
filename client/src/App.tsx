@@ -20,7 +20,6 @@ import AIChatDrawer from './components/AIChatDrawer';
 import SavedLocations from './components/SavedLocations';
 import HistoricalComparison from './components/HistoricalComparison';
 import PrecipTimeline from './components/PrecipTimeline';
-import RadarMap from './components/RadarMap';
 import WeekendPlanner from './components/WeekendPlanner';
 import CommuteMode from './components/CommuteMode';
 import CustomAlerts from './components/CustomAlerts';
@@ -28,6 +27,12 @@ import DigestSubscribe from './components/DigestSubscribe';
 import ErrorBoundary from './components/ErrorBoundary';
 import OfflineBanner from './components/OfflineBanner';
 import AboutPage from './components/AboutPage';
+import NotFoundPage from './components/NotFoundPage';
+import RadarPage from './components/RadarPage';
+import BottomNav from './components/BottomNav';
+import FeedbackWidget from './components/FeedbackWidget';
+import WelcomeScreen from './components/WelcomeScreen';
+import { AuthButton } from './components/AuthButton';
 import { conditionCodeToEmoji, formatTemp } from './utils/formatters';
 import {
   useCurrentWeather,
@@ -43,7 +48,7 @@ import {
 import { useLocation } from './hooks/useLocation';
 import { useSavedLocations } from './hooks/useSavedLocations';
 
-type ForecastView = 'daily' | 'hourly' | 'radar' | 'weekend';
+type ForecastView = 'daily' | 'hourly' | 'weekend';
 type Theme = 'dark' | 'light';
 
 function conditionBgClass(conditionCode?: string): string {
@@ -57,8 +62,10 @@ function conditionBgClass(conditionCode?: string): string {
 }
 
 export default function App() {
-  const [city, setCity] = useState('Toronto');
-  const [searchValue, setSearchValue] = useState('Toronto');
+  const lastCity = localStorage.getItem('ww_last_city') ?? '';
+  const [showWelcome, setShowWelcome] = useState(!lastCity);
+  const [city, setCity] = useState(lastCity);
+  const [searchValue, setSearchValue] = useState(lastCity);
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [showAccuracy, setShowAccuracy] = useState(false);
   const [unit, setUnit] = useState<'C' | 'F'>('C');
@@ -92,6 +99,7 @@ export default function App() {
     setCity(newCity);
     setSearchValue(newCity);
     setCoords(null);
+    setShowWelcome(false);
   });
 
   // Apply / remove light-mode class on <html>
@@ -148,12 +156,34 @@ export default function App() {
 
       <Routes>
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/radar" element={<RadarPage />} />
+        <Route path="/404" element={<NotFoundPage />} />
         <Route path="/*" element={<>
+
+      {/* ─── WELCOME SCREEN ─── */}
+      {showWelcome && (
+        <WelcomeScreen
+          onLocate={locate}
+          locating={locating}
+          geoError={geoError ?? undefined}
+          onSearch={(cityLabel, c) => {
+            setCity(cityLabel);
+            setSearchValue(cityLabel);
+            setCoords(c ?? null);
+            setShowWelcome(false);
+          }}
+        />
+      )}
+
+      {!showWelcome && <>
 
       {/* ─── STICKY HEADER ─── */}
       <header className="sticky top-0 z-30 bg-black/25 backdrop-blur-md border-b border-white/10">
-        <div className="max-w-[1400px] mx-auto px-4 h-14 flex items-center gap-3">
-          <Link to="/" className="text-white font-bold text-lg tracking-tight shrink-0 hover:text-white/80 transition-colors">WeatherWise</Link>
+        <div className="max-w-[1400px] mx-auto px-3 sm:px-4 h-14 flex items-center gap-2 sm:gap-3">
+          <Link to="/" className="text-white font-bold text-base sm:text-lg tracking-tight shrink-0 hover:text-white/80 transition-colors">
+            <span className="hidden sm:inline">WeatherWise</span>
+            <span className="sm:hidden">WW</span>
+          </Link>
 
           <div className="flex-1 min-w-0">
             <SearchBar
@@ -166,22 +196,14 @@ export default function App() {
             />
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* About link */}
-            <Link
-              to="/about"
-              className="text-xs px-2.5 py-1 rounded-lg text-white/50 hover:text-white/80 transition-colors hidden sm:block"
-            >
-              About
-            </Link>
-
-            {/* °C / °F toggle */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            {/* °C / °F toggle — always visible */}
             <div className="flex gap-0.5 bg-white/10 rounded-lg p-0.5">
               {(['C', 'F'] as const).map(u => (
                 <button
                   key={u}
                   onClick={() => setUnit(u)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  className={`px-2 sm:px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                     unit === u ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'
                   }`}
                 >
@@ -190,66 +212,119 @@ export default function App() {
               ))}
             </div>
 
-            {/* Theme toggle */}
+            {/* Theme toggle — always visible */}
             <button
               onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="text-xs px-2.5 py-1 rounded-lg bg-white/10 text-white/50 hover:text-white/80 hover:bg-white/15 transition-colors"
+              className="text-xs px-2 sm:px-2.5 py-1 rounded-lg bg-white/10 text-white/50 hover:text-white/80 hover:bg-white/15 transition-colors"
             >
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
 
-            {weather && (
-              <>
-                <div className="flex gap-0.5 bg-white/10 rounded-lg p-0.5">
-                  {(['daily', 'hourly', 'radar', 'weekend'] as const).map(v => (
-                    <button
-                      key={v}
-                      onClick={() => setForecastView(v)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors capitalize ${
-                        forecastView === v ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'
-                      }`}
-                    >
-                      {v === 'radar' ? '📡' : v === 'weekend' ? '📅' : v}
-                    </button>
-                  ))}
-                </div>
+            {/* Desktop-only controls */}
+            <div className="hidden sm:flex items-center gap-1.5">
+              <Link
+                to="/about"
+                className="text-xs px-2.5 py-1 rounded-lg text-white/50 hover:text-white/80 transition-colors"
+              >
+                About
+              </Link>
 
-                <button
-                  onClick={() => setShowAccuracy(v => !v)}
-                  className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors flex items-center gap-1 ${
-                    showAccuracy ? 'bg-white/20 text-white' : 'bg-white/10 text-white/50 hover:text-white/80'
-                  }`}
-                >
-                  Scorecard
-                  {accuracyData?.usingDynamicWeights && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" title="Dynamic weights active" />
-                  )}
-                </button>
+              <AuthButton />
 
-                <button
-                  onClick={() => {
-                    if (isSaved(city)) {
-                      removeLocation(city);
-                    } else {
-                      saveLocation({ label: searchValue, city, lat: coords?.lat ?? null, lon: coords?.lon ?? null });
-                    }
-                  }}
-                  title={isSaved(city) ? 'Remove from saved' : 'Save this location'}
-                  className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
-                    isSaved(city)
-                      ? 'bg-blue-500/25 text-blue-300 hover:bg-red-500/20 hover:text-red-300'
-                      : 'bg-white/10 text-white/50 hover:text-white/80'
-                  }`}
-                >
-                  {isSaved(city) ? '★' : '☆'}
-                </button>
+              {weather && (
+                <>
+                  <div className="flex gap-0.5 bg-white/10 rounded-lg p-0.5">
+                    {(['daily', 'hourly', 'weekend'] as const).map(v => (
+                      <button
+                        key={v}
+                        onClick={() => setForecastView(v)}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors capitalize ${
+                          forecastView === v ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'
+                        }`}
+                      >
+                        {v === 'weekend' ? '📅' : v}
+                      </button>
+                    ))}
+                  </div>
 
-                <ShareCard consensus={weather.consensus} city={city} unit={unit} />
-              </>
-            )}
+                  <button
+                    onClick={() => setShowAccuracy(v => !v)}
+                    className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors flex items-center gap-1 ${
+                      showAccuracy ? 'bg-white/20 text-white' : 'bg-white/10 text-white/50 hover:text-white/80'
+                    }`}
+                  >
+                    Scorecard
+                    {accuracyData?.usingDynamicWeights && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" title="Dynamic weights active" />
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (isSaved(city)) {
+                        removeLocation(city);
+                      } else {
+                        saveLocation({ label: searchValue, city, lat: coords?.lat ?? null, lon: coords?.lon ?? null });
+                      }
+                    }}
+                    title={isSaved(city) ? 'Remove from saved' : 'Save this location'}
+                    className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
+                      isSaved(city)
+                        ? 'bg-blue-500/25 text-blue-300 hover:bg-red-500/20 hover:text-red-300'
+                        : 'bg-white/10 text-white/50 hover:text-white/80'
+                    }`}
+                  >
+                    {isSaved(city) ? '★' : '☆'}
+                  </button>
+
+                  <ShareCard consensus={weather.consensus} city={city} unit={unit} />
+                </>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Mobile-only sub-toolbar: forecast view + save */}
+        {weather && (
+          <div className="sm:hidden px-3 pb-2 flex items-center gap-2">
+            <div className="flex gap-0.5 bg-white/10 rounded-lg p-0.5">
+              {(['daily', 'hourly', 'weekend'] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => setForecastView(v)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors capitalize ${
+                    forecastView === v ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'
+                  }`}
+                >
+                  {v === 'weekend' ? '📅' : v}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                if (isSaved(city)) {
+                  removeLocation(city);
+                } else {
+                  saveLocation({ label: searchValue, city, lat: coords?.lat ?? null, lon: coords?.lon ?? null });
+                }
+              }}
+              title={isSaved(city) ? 'Remove from saved' : 'Save this location'}
+              className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
+                isSaved(city)
+                  ? 'bg-blue-500/25 text-blue-300 hover:bg-red-500/20 hover:text-red-300'
+                  : 'bg-white/10 text-white/50 hover:text-white/80'
+              }`}
+            >
+              {isSaved(city) ? '★ Saved' : '☆ Save'}
+            </button>
+
+            <div className="ml-auto">
+              <AuthButton />
+            </div>
+          </div>
+        )}
         {geoError && (
           <p className="text-center text-amber-400/80 text-xs pb-1">{geoError}</p>
         )}
@@ -269,7 +344,7 @@ export default function App() {
       <OfflineBanner isOffline={isOffline} />
 
       {/* ─── MAIN CONTENT ─── */}
-      <div className="max-w-[1400px] mx-auto px-4 pt-4 pb-20">
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 pt-3 sm:pt-4 pb-28 sm:pb-24">
 
         {isLoading && (
           <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-12 text-center">
@@ -367,7 +442,7 @@ export default function App() {
               <div className="space-y-3">
                 {precipTimeline && precipTimeline.minutes.length > 0 && (
                   <ErrorBoundary>
-                    <PrecipTimeline data={precipTimeline} />
+                    <PrecipTimeline data={precipTimeline} hours={extendedHourly?.hours} sources={weather.sources} />
                   </ErrorBoundary>
                 )}
 
@@ -402,12 +477,6 @@ export default function App() {
 
                 {forecastView === 'hourly' && hourlyData && (
                   <HourlyChart hours={hourlyData.hours} unit={unit} />
-                )}
-
-                {forecastView === 'radar' && (
-                  <ErrorBoundary>
-                    <RadarMap city={city} lat={coords?.lat} lon={coords?.lon} />
-                  </ErrorBoundary>
                 )}
 
                 {forecastView === 'weekend' && forecastData && (
@@ -532,13 +601,18 @@ export default function App() {
 
       </div>
 
-      {/* AI Chat FAB */}
+      {/* Feedback widget — bottom-left, above nav */}
+      <FeedbackWidget />
+
+      {/* AI Chat FAB — bottom-right, above nav */}
       <button
         onClick={() => setChatOpen(true)}
-        className="fixed bottom-6 right-6 bg-blue-500 hover:bg-blue-600 text-white rounded-full px-5 py-3 shadow-lg text-sm font-medium transition-colors z-40"
+        className="fixed bottom-20 right-4 sm:bottom-24 sm:right-6 bg-blue-500 hover:bg-blue-600 text-white rounded-full px-4 py-2.5 sm:px-5 sm:py-3 shadow-lg text-sm font-medium transition-colors z-40"
       >
         Ask AI
       </button>
+
+      <BottomNav city={city} coords={coords} />
 
       <ErrorBoundary>
         <AIChatDrawer
@@ -547,6 +621,7 @@ export default function App() {
           onClose={() => setChatOpen(false)}
         />
       </ErrorBoundary>
+      </>}
       </>} />
       </Routes>
     </>

@@ -83,7 +83,7 @@ export default function AIChatDrawer({ city, isOpen, onClose }: Props) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl p-4 max-h-[60vh] flex flex-col">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] max-h-[75vh] sm:max-h-[60vh] flex flex-col">
       <div className="flex justify-between items-center mb-3">
         <h3 className="font-semibold text-gray-800">Ask WeatherWise AI</h3>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
