@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: weatherwise
+    env: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: weatherwise-db
+          property: connectionString
+      - key: DATABASE_SSL
+        value: "true"
+      - key: APP_URL
+        sync: false
+      - key: OPENWEATHERMAP_API_KEY
+        sync: false
+      - key: TOMORROW_IO_API_KEY
+        sync: false
+      - key: WEATHERAPI_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+
+databases:
+  - name: weatherwise-db
+    databaseName: weatherwise
+    user: weatherwise
+    plan: free
