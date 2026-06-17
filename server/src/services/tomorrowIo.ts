@@ -101,6 +101,53 @@ export async function getCurrentWeather(city: string, coords?: { lat: number; lo
   };
 }
 
+export interface PrecipMinute {
+  time: string;
+  precipProbability: number;
+  precipIntensity: number;
+}
+
+export async function getPrecipTimeline(city: string, coords?: { lat: number; lon: number }): Promise<PrecipMinute[]> {
+  const apiKey = process.env.TOMORROW_IO_API_KEY;
+  if (!apiKey) throw new Error('TOMORROW_IO_API_KEY not set');
+
+  const geo = coords ? { lat: coords.lat, lon: coords.lon } : await geocode(city);
+
+  const timelineRes = await axios.get('https://api.tomorrow.io/v4/timelines', {
+    params: {
+      location: `${geo.lat},${geo.lon}`,
+      fields: ['precipitationProbability', 'precipitationIntensity'].join(','),
+      timesteps: '1m',
+      units: 'metric',
+      apikey: apiKey,
+    },
+    validateStatus: status => status < 500,
+  });
+
+  if (timelineRes.status === 429) {
+    throw new Error('TOMORROW_RATE_LIMITED');
+  }
+
+  const { data } = timelineRes;
+
+  const timeline = data.data?.timelines?.[0];
+  if (!timeline) return [];
+
+  const now = new Date();
+  const cutoff = new Date(now.getTime() + 60 * 60 * 1000); // 60 minutes ahead
+
+  return timeline.intervals
+    .filter((iv: any) => {
+      const t = new Date(iv.startTime);
+      return t >= now && t <= cutoff;
+    })
+    .map((iv: any) => ({
+      time: iv.startTime,
+      precipProbability: iv.values.precipitationProbability ?? 0,
+      precipIntensity: iv.values.precipitationIntensity ?? 0,
+    }));
+}
+
 export async function getForecast(city: string, days: number = 7, coords?: { lat: number; lon: number }): Promise<ForecastDay[]> {
   const apiKey = process.env.TOMORROW_IO_API_KEY;
   if (!apiKey) throw new Error('TOMORROW_IO_API_KEY not set');

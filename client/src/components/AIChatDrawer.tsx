@@ -4,6 +4,8 @@ import PromptChips from './PromptChips';
 interface Message {
   role: 'user' | 'ai';
   text: string;
+  question?: string;
+  isRateLimited?: boolean;
 }
 
 interface Props {
@@ -23,6 +25,7 @@ export default function AIChatDrawer({ city, isOpen, onClose }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [ratings, setRatings] = useState<Record<number, 'up' | 'down'>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,8 +52,15 @@ export default function AIChatDrawer({ city, isOpen, onClose }: Props) {
         body: JSON.stringify({ city, question, history }),
       });
       const data = await res.json();
-      const text = res.ok ? data.answer : (data.error ?? 'Something went wrong.');
-      setMessages(prev => [...prev, { role: 'ai', text }]);
+      if (res.status === 429 && data.error === 'rate_limited') {
+        setMessages(prev => [
+          ...prev,
+          { role: 'ai', text: data.message ?? "AI is taking a breather — try again in a minute.", isRateLimited: true },
+        ]);
+      } else {
+        const text = res.ok ? data.answer : (data.error ?? 'Something went wrong.');
+        setMessages(prev => [...prev, { role: 'ai', text, question }]);
+      }
     } catch {
       setMessages(prev => [
         ...prev,
@@ -59,6 +69,15 @@ export default function AIChatDrawer({ city, isOpen, onClose }: Props) {
     } finally {
       setLoading(false);
     }
+  }
+
+  function rateMessage(index: number, rating: 'up' | 'down', msg: Message) {
+    setRatings(prev => ({ ...prev, [index]: rating }));
+    fetch('/api/weather/ai-feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ city, question: msg.question ?? '', answer: msg.text, rating }),
+    }).catch(() => {});
   }
 
   if (!isOpen) return null;
@@ -75,14 +94,39 @@ export default function AIChatDrawer({ city, isOpen, onClose }: Props) {
           <PromptChips prompts={SUGGESTED_PROMPTS} onSelect={sendMessage} />
         )}
         {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div className={`rounded-2xl px-4 py-2 max-w-[85%] text-sm ${
               msg.role === 'user'
                 ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-800'
+                : msg.isRateLimited
+                  ? 'bg-amber-50 border border-amber-300 text-amber-800'
+                  : 'bg-gray-100 text-gray-800'
             }`}>
+              {msg.isRateLimited && <span className="mr-1">⚡</span>}
               {msg.text}
             </div>
+            {msg.role === 'ai' && (
+              <div className="flex gap-1 mt-1 ml-1">
+                <button
+                  onClick={() => rateMessage(i, 'up', msg)}
+                  title="This was helpful"
+                  className={`text-sm px-1.5 py-0.5 rounded transition-colors ${
+                    ratings[i] === 'up' ? 'text-emerald-600' : 'text-gray-400 hover:text-emerald-500'
+                  }`}
+                >
+                  👍
+                </button>
+                <button
+                  onClick={() => rateMessage(i, 'down', msg)}
+                  title="This wasn't helpful"
+                  className={`text-sm px-1.5 py-0.5 rounded transition-colors ${
+                    ratings[i] === 'down' ? 'text-red-500' : 'text-gray-400 hover:text-red-400'
+                  }`}
+                >
+                  👎
+                </button>
+              </div>
+            )}
           </div>
         ))}
         {loading && (

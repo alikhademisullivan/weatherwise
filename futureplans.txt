@@ -1,48 +1,60 @@
+Feature Implementation Status — All 15 Done ✓
 
+All features implemented. See git history for details.
 
+Original planning notes below:
 
-2. Forecast Track Record (No App Shows This)
-Public perception of weather app forecast accuracy underlies their value and trustworthiness, yet misunderstanding and false expectations remain a persistent problem. Nobody holds their own forecasts accountable. doaj
-WeatherWise can:
+Missing Features — Full Priority List
+Tier 1 — Critical, Ship These (High Need, Achievable)
+1. Interactive Radar Map
 
-Store what each source predicted yesterday, then compare it to what actually happened
-Show a "Source Scorecard" per city: "OpenWeatherMap was right 78% of the time in London this month"
-Over time this powers your adaptive weighting AND becomes a marketing hook: "We show you which source actually gets your city right"
+The single biggest source of negative reviews across every weather app is inaccurate forecasts — users saying "said sunny, rained all day" — and radar is the primary tool people use to verify a forecast themselves. Every major app has it. WeatherWise doesn't. Use the free Open-Meteo radar tiles or RainViewer's free API for animated precipitation radar. This is the single biggest functional gap in the app right now. Unstar
+2. Precipitation Timeline ("Next Hour" View)
 
-This is a genuine first. No consumer weather app does transparent historical accuracy per location.
+Dark Sky built its entire identity on "Rain starting in 23 minutes." Apple killed Dark Sky and users have never forgiven them for losing this. Reviewers who loved Dark Sky's minute-by-minute precipitation tracking never forgave Apple — the replacement has minute-by-minute notifications in fewer regions, no rain-intensity graph. Tomorrow.io's API already gives you probabilistic minute-by-minute precip data. Surface it as a simple bar chart showing the next 60 minutes. This is a genuine gap in the market right now. Unstar
+3. Multi-City / Saved Locations
 
-3. The "When" View, Not Just "What"
-Most apps now meet basic accuracy standards but are held back by cluttered information, with core weather data getting tangled up with random lifestyle features. financialcontent
-Instead of a standard hourly strip, build a Best Window view:
+Right now users can only search one city at a time. Anyone who travels, has family elsewhere, or plans trips needs to save multiple locations and switch between them instantly. Location and widget bugs including "widget shows wrong city" and "lost my saved locations after update" are a top complaint category. Store saved cities in localStorage, show them as tabs or a dropdown. One afternoon of work, massive quality-of-life improvement. Unstar
+4. PWA — Installable App
 
-"Best 2 hours to be outside today: 2pm–4pm"
-"Rain clears at 11am, returns at 6pm"
-Reduces the cognitive load of scanning an hourly chart and doing the math yourself
-Works especially well for commuters, dog walkers, anyone with a flexible schedule
+Without this, WeatherWise is a website. With it, it's an app icon on your home screen, works offline for last cached data, and gets a full-screen experience. Weather is a daily-check habit — users need it to feel like an app, not a URL they have to find in their browser.
+5. Historical Comparison ("Yesterday / Last Year")
 
+The Weather Network shows this. "Yesterday's high was 18°C. Average for this date is 21°C." Users love context — it makes the forecast feel grounded. Open-Meteo's historical API gives you this for free. One API call, simple display.
 
-4. Honest Long-Range Forecasts
-Every app shows a 10-day forecast with false precision. Day 8 showing "23°C, partly cloudy" is basically fiction. WeatherWise can be the first app to be honest about this:
+Tier 2 — Strong Differentiators (Medium Effort, High Value)
+6. Weekend / Event Planner View
 
-Days 1–3: show a specific number (high confidence)
-Days 4–6: show a range, e.g. "18–24°C"
-Days 7–10: show only a trend, "Warmer than average, some rain likely"
-Visually encode the uncertainty with widening bands on the chart
+A dedicated "Weekend" tab showing Saturday and Sunday side by side with hour-by-hour confidence scores. Tap any hour to see the full source breakdown for that specific time. The Weather Network has a Weekend tab — WeatherWise can do it better by showing inter-source agreement per hour.
+7. Custom Notification Alerts
 
-Trust is fragile in this category. Apps that prioritize accuracy and restraint rise in reviews, while those that optimize for impressions fall, slowly at first and then all at once. Being honest about what you don't know is a trust-building differentiator, not a weakness. Unstar
+Right now notifications are only for rain and disputed forecasts. Users opt in to notifications expecting one type and receive another — notifications for rain in cities they don't live in, or cross-promotion abuse. Let users set their own thresholds: "Alert me when wind exceeds 30 km/h," "Notify me if tomorrow's high drops below 10°C," "Warn me if sources disagree by more than 4°C." This is the notification feature nobody has built well. Unstar
+8. Feels-Like Prominently in Hero
 
-5. Micro-Location Learning
-Most APIs give city-level data. But weather varies dramatically within a city. Someone in a valley gets fog when the hilltop doesn't. Build a lightweight "Is your forecast accurate here?" feedback loop:
+Feels like temperature is often more useful than actual temperature. Right now it's buried in a stat card. It should be right next to the main temperature in the hero, styled smaller but always visible. This is a top user request across every weather app.
+9. Moon Phase + Astronomical Data
 
-One-tap thumbs up/down after a forecast plays out
-Aggregate anonymous feedback to flag locations where sources consistently over/underperform
-"Sources tend to miss rain in your area, we apply a correction" is a genuinely powerful feature no one has built at a consumer level
+The Weather Network has this. Surfers, gardeners, photographers, astronomers, hikers all care about moon phase, golden hour, and blue hour times. You already have sunrise/sunset — moon phase is one additional API field from Open-Meteo and takes an hour to display properly.
+10. 14-Day Forecast (with heavy uncertainty disclosure)
 
+The Weather Network shows 14 days. You show 7. Beyond day 7 your honest-forecast system is perfect for this — show days 8-14 as trend-only with maximum transparency. Your honesty framing makes this a feature rather than false precision.
 
-6. Zero Ads, Zero Paywalls on Core Data
-The Weather Channel app is the most ad-heavy in the category according to review volume, with users complaining specifically about auto-playing video ads. This is a wide open lane. Unstar
-Commit publicly to no ads on core forecast data. Monetize only on optional premium features (the activity engine, source scorecard history, multi-location). The positioning writes itself: "Weather data shouldn't have a paywall."
+Tier 3 — Polish and Retention (Lower Effort, Real Impact)
+11. Daily Summary Email / Digest
 
-Priority Stack for Your Roadmap
-FeatureEffortDifferentiationBuild WhenForecast Dispute IndicatorLowHighPhase 1Decision Engine (activities)MediumVery HighPhase 2Honest long-range uncertainty bandsLowHighPhase 2Best Window viewMediumHighPhase 2Source Scorecard / track recordHighVery HighPhase 3Micro-location feedback loopHighHighPhase 3
-The Decision Engine and Source Scorecard are the two features that could genuinely make this feel like a different category of app, not just another weather aggregator. Want to dig into how to architect either of those?You said: the decision engine can it not just be a ai or chatbot with rag access to our data from the api i feel like this is a much better approach in today age
+"Good morning. Toronto today: 22°C, sources agree (87% confidence). Best time outside: 10am-noon." A simple opt-in daily email using your existing data. Nodemailer + a cron job. Keeps users engaged even when they don't open the app.
+12. Commute Mode
+
+Two configurable times (morning departure, evening return). Shows a compact card for each: conditions at that exact time, confidence score, and a one-line AI recommendation. "Your 8am commute: clear, 18°C, sources agree. No umbrella needed." Directly solves the #1 use case people open weather apps for.
+13. "Was the AI Right?" Feedback Loop
+
+After the AI answers a question, show a small thumbs up/down 24 hours later: "Yesterday the AI said bring an umbrella. Was it right?" Feed this back to improve the system prompt over time. Closes the loop on AI trust.
+14. Keyboard Shortcut — Press / to Search
+
+Power user feature. Press / anywhere in the app to jump to the search bar. Small touch, makes the app feel polished to technical users.
+15. Dark / Light Mode Toggle
+
+Currently appears to be dark-mode only. Some users want light mode for outdoor readability. System-preference detection plus a manual toggle.
+
+Priority Table
+#FeatureEffortNeedDifferentiator1Interactive RadarMediumCriticalNo2Next-Hour Precip TimelineMediumCriticalYes3Multi-City Saved LocationsLowCriticalNo4PWA InstallableLowCriticalNo5Historical ComparisonLowHighNo6Weekend Planner ViewMediumHighYes7Custom Notification AlertsMediumHighYes8Feels-Like in HeroVery LowHighNo9Moon PhaseLowMediumNo1014-Day ForecastLowMediumNo11Daily Digest EmailMediumMediumYes12Commute ModeMediumHighYes13AI Feedback LoopLowMediumYes14Keyboard ShortcutVery LowLowNo15Dark/Light ModeLowMediumNo

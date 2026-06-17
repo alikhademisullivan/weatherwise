@@ -153,14 +153,14 @@ router.get('/current', async (req: Request, res: Response) => {
 // GET /api/weather/forecast?city=Toronto&days=7[&lat=X&lon=Y]
 router.get('/forecast', async (req: Request, res: Response) => {
   const city = req.query.city as string;
-  const days = Math.min(parseInt(req.query.days as string ?? '7', 10), 7);
+  const days = Math.min(parseInt(req.query.days as string ?? '7', 10), 14);
   if (!city) return res.status(400).json({ error: 'city query param is required' });
 
   const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
   const lon = req.query.lon ? parseFloat(req.query.lon as string) : undefined;
   const coords = lat !== undefined && lon !== undefined ? { lat, lon } : undefined;
 
-  const cacheKey = coords ? `coords:${lat},${lon}:forecast` : buildCacheKey(city, 'forecast');
+  const cacheKey = coords ? `coords:${lat},${lon}:forecast:${days}` : buildCacheKey(city, `forecast-${days}` as any);
   const cached = getCached<ForecastResponse>(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
 
@@ -171,7 +171,7 @@ router.get('/forecast', async (req: Request, res: Response) => {
     // Record predictions for accuracy tracking (non-blocking)
     recordForecastPredictions(city, perSource);
 
-    const forecast = mergeForecastDays(perSource);
+    const forecast = mergeForecastDays(perSource).slice(0, days);
     const response: ForecastResponse = {
       location: city,
       forecast,
@@ -186,7 +186,7 @@ router.get('/forecast', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/weather/hourly?city=Toronto[&lat=X&lon=Y]
+// GET /api/weather/hourly?city=Toronto[&lat=X&lon=Y&days=2]
 router.get('/hourly', async (req: Request, res: Response) => {
   const city = req.query.city as string;
   if (!city) return res.status(400).json({ error: 'city query param is required' });
@@ -194,13 +194,14 @@ router.get('/hourly', async (req: Request, res: Response) => {
   const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
   const lon = req.query.lon ? parseFloat(req.query.lon as string) : undefined;
   const coords = lat !== undefined && lon !== undefined ? { lat, lon } : undefined;
+  const days = Math.min(parseInt(req.query.days as string ?? '2', 10), 7);
 
-  const cacheKey = coords ? `coords:${lat},${lon}:hourly` : buildCacheKey(city, 'hourly' as any);
+  const cacheKey = coords ? `coords:${lat},${lon}:hourly:${days}` : buildCacheKey(city, `hourly-${days}` as any);
   const cached = getCached<HourlyForecastResponse>(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
 
   try {
-    const hours = await openMeteo.getHourlyForecast(city, coords);
+    const hours = await openMeteo.getHourlyForecast(city, coords, days);
     const response: HourlyForecastResponse = {
       location: city,
       hours,
@@ -294,6 +295,159 @@ router.get('/feedback-summary', async (req: Request, res: Response) => {
   if (!city) return res.status(400).json({ error: 'city query param is required' });
   const summary = await getFeedbackSummary(city);
   return res.json({ city, ...summary });
+});
+
+// GET /api/weather/precipitation-timeline?city=Toronto[&lat=X&lon=Y]
+// Returns minute-by-minute precip for the next 60 min (Tomorrow.io) or hourly fallback (Open-Meteo)
+router.get('/precipitation-timeline', async (req: Request, res: Response) => {
+  const city = req.query.city as string;
+  if (!city) return res.status(400).json({ error: 'city query param is required' });
+
+  const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
+  const lon = req.query.lon ? parseFloat(req.query.lon as string) : undefined;
+  const coords = lat !== undefined && lon !== undefined ? { lat, lon } : undefined;
+
+  const cacheKey = coords ? `coords:${lat},${lon}:precip-timeline` : `${city.toLowerCase().trim()}:precip-timeline`;
+  const cached = getCached<any>(cacheKey);
+  if (cached) return res.json({ ...cached, cached: true });
+
+  // Try Tomorrow.io minute-by-minute first; fall back to Open-Meteo hourly on rate-limit
+  if (process.env.TOMORROW_IO_API_KEY) {
+    try {
+      const minutes = await tomorrowIo.getPrecipTimeline(city, coords);
+      const response = { city, minutes, source: 'Tomorrow.io', updatedAt: new Date().toISOString() };
+      setCached(cacheKey, response);
+      return res.json(response);
+    } catch (err: any) {
+      if (err?.message === 'TOMORROW_RATE_LIMITED') {
+        // Fall through to Open-Meteo hourly fallback below
+        console.warn('[precip-timeline] Tomorrow.io rate limited — using Open-Meteo fallback');
+      } else {
+        console.warn('[precip-timeline] Tomorrow.io failed:', err?.message);
+        // Also fall through to Open-Meteo
+      }
+    }
+  }
+
+  try {
+    const hours = await openMeteo.getHourlyForecast(city, coords);
+    const minutes = hours.map(h => ({
+      time: h.time,
+      precipProbability: h.precipitationProbability,
+      precipIntensity: 0,
+    }));
+
+    const response = {
+      city,
+      minutes,
+      source: 'Open-Meteo',
+      fallback: true,
+      message: 'Minute-by-minute data temporarily unavailable — showing hourly data instead.',
+      updatedAt: new Date().toISOString(),
+    };
+    setCached(cacheKey, response);
+    return res.json(response);
+  } catch (err: any) {
+    console.error('[precip-timeline]', err);
+    return res.status(500).json({ error: err.message ?? 'Internal server error' });
+  }
+});
+
+// GET /api/weather/historical?city=Toronto[&lat=X&lon=Y]
+// Returns yesterday's actual high/low and last year's same-date high/low
+router.get('/historical', async (req: Request, res: Response) => {
+  const city = req.query.city as string;
+  if (!city) return res.status(400).json({ error: 'city query param is required' });
+
+  const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
+  const lon = req.query.lon ? parseFloat(req.query.lon as string) : undefined;
+
+  const cacheKey = lat !== undefined && lon !== undefined
+    ? `coords:${lat},${lon}:historical`
+    : `${city.toLowerCase().trim()}:historical`;
+  const cached = getCached<any>(cacheKey);
+  if (cached) return res.json({ ...cached, cached: true });
+
+  try {
+    let geoLat: number, geoLon: number;
+    if (lat !== undefined && lon !== undefined) {
+      geoLat = lat; geoLon = lon;
+    } else {
+      const { data } = await axios.get('https://geocoding-api.open-meteo.com/v1/search', {
+        params: { name: city, count: 1, language: 'en', format: 'json' },
+      });
+      if (!data.results?.length) return res.status(404).json({ error: 'City not found' });
+      geoLat = data.results[0].latitude;
+      geoLon = data.results[0].longitude;
+    }
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    const lastYear = new Date(yesterday);
+    lastYear.setFullYear(lastYear.getFullYear() - 1);
+    const lastYearStr = lastYear.toISOString().split('T')[0];
+
+    const [yesterdayData, lastYearData] = await Promise.all([
+      openMeteo.getHistoricalDay(geoLat, geoLon, yesterdayStr),
+      openMeteo.getHistoricalDay(geoLat, geoLon, lastYearStr),
+    ]);
+
+    const response = {
+      city,
+      yesterdayDate: yesterdayStr,
+      lastYearDate: lastYearStr,
+      yesterday: yesterdayData,
+      lastYear: lastYearData,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setCached(cacheKey, response);
+    return res.json(response);
+  } catch (err: any) {
+    console.error(err);
+    return res.status(500).json({ error: err.message ?? 'Internal server error' });
+  }
+});
+
+// POST /api/weather/ai-feedback
+// Body: { city, question, answer, rating: 'up' | 'down' }
+router.post('/ai-feedback', (req: Request, res: Response) => {
+  const { city, question, answer, rating } = req.body ?? {};
+  if (!city || !rating || !['up', 'down'].includes(rating)) {
+    return res.status(400).json({ error: 'city and rating (up/down) required' });
+  }
+  console.log(`[AI Feedback] ${rating} — ${city}: "${question?.slice(0, 60)}"`);
+  return res.json({ ok: true });
+});
+
+// POST /api/weather/digest/subscribe
+// Body: { email, city }
+router.post('/digest/subscribe', async (req: Request, res: Response) => {
+  const { email, city } = req.body ?? {};
+  if (!email || !city) return res.status(400).json({ error: 'email and city required' });
+  try {
+    const { addSubscriber } = await import('../services/emailDigest');
+    await addSubscriber(email.trim().toLowerCase(), city.trim());
+    return res.json({ ok: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/weather/digest/unsubscribe
+// Body: { email }
+router.delete('/digest/unsubscribe', async (req: Request, res: Response) => {
+  const { email } = req.body ?? {};
+  if (!email) return res.status(400).json({ error: 'email required' });
+  try {
+    const { removeSubscriber } = await import('../services/emailDigest');
+    await removeSubscriber(email.trim().toLowerCase());
+    return res.json({ ok: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 // GET /api/weather/geocode/search?q=Toronto

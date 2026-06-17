@@ -95,3 +95,125 @@
 .scrollbar-thin::-webkit-scrollbar { height: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* ── Light Mode ── */
+html.light body {
+  color: rgba(15, 23, 42, 0.87);
+}
+
+html.light .wx-bg {
+  filter: saturate(0.35) brightness(2.6) !important;
+  animation: none !important;
+  opacity: 0.45;
+}
+
+/* Glass panels — bg-white/* become visible light panels; bg-white/5 and /10 were near-invisible */
+html.light [class*="bg-white/"] {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+}
+html.light [class*="bg-black/"] {
+  background-color: rgba(255, 255, 255, 0.84) !important;
+}
+
+/* Very-low-opacity white panels that read as invisible in light mode */
+html.light .bg-white\/5 {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+html.light .bg-white\/8 {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+html.light .bg-white\/10 {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Text — map white opacity to matching dark opacity */
+html.light [class*="text-white"] {
+  color: rgba(15, 23, 42, 0.82) !important;
+}
+
+/* Borders — white/10 borders vanish on white background */
+html.light [class*="border-white/"] {
+  border-color: rgba(0, 0, 0, 0.10) !important;
+}
+
+/* Inputs */
+html.light input[class*="bg-white/"] {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  color: rgba(15, 23, 42, 0.85) !important;
+  border-color: rgba(0, 0, 0, 0.14) !important;
+}
+html.light input::placeholder {
+  color: rgba(15, 23, 42, 0.30) !important;
+}
+
+/* Autocomplete dropdown */
+html.light .bg-gray-900\/95 {
+  background-color: rgba(255, 255, 255, 0.97) !important;
+}
+html.light .text-white:not([class*="bg-blue"]):not([class*="bg-emerald"]) {
+  color: rgba(15, 23, 42, 0.80) !important;
+}
+
+/* Keep coloured status badges, buttons, and charts readable */
+html.light .bg-blue-500,
+html.light .bg-blue-600,
+html.light .bg-emerald-400,
+html.light .bg-red-500,
+html.light .bg-amber-400 {
+  opacity: 1;
+}
+html.light .text-emerald-400,
+html.light .text-amber-300,
+html.light .text-amber-400,
+html.light .text-blue-300,
+html.light .text-cyan-300,
+html.light .text-red-300,
+html.light .text-yellow-300 {
+  /* keep coloured text — only override pure white */
+  color: inherit;
+}
+
+/* Recharts — bars and lines are hardcoded to light colours that vanish on white */
+html.light .recharts-cartesian-axis-tick text {
+  fill: rgba(15, 23, 42, 0.50) !important;
+}
+html.light .recharts-tooltip-wrapper .bg-gray-900\/90 {
+  background-color: rgba(255, 255, 255, 0.97) !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Confidence bar gradient — keep it readable on a light background */
+html.light .confidence-bar-bg {
+  background: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Dispute badge — amber text stays, background needs contrast */
+html.light .dispute-badge {
+  background-color: rgba(251, 191, 36, 0.15) !important;
+  border-color: rgba(251, 191, 36, 0.35) !important;
+}
+
+/* Source breakdown outlier highlight */
+html.light .outlier-highlight {
+  background-color: rgba(239, 68, 68, 0.10) !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+
+/* Dark card overrides that slip through the generic rules */
+html.light .bg-gray-800,
+html.light .bg-gray-900,
+html.light .bg-slate-800,
+html.light .bg-slate-900 {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+}
+html.light .text-gray-200,
+html.light .text-gray-100,
+html.light .text-slate-200,
+html.light .text-slate-100 {
+  color: rgba(15, 23, 42, 0.75) !important;
+}
+
+/* Theme transition */
+*, *::before, *::after {
+  transition: background-color 0.25s ease, color 0.15s ease, border-color 0.15s ease;
+}

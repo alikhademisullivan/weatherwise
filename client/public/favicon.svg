@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Dark background circle -->
+  <circle cx="32" cy="32" r="32" fill="#1e3a5f"/>
+  <!-- Sun -->
+  <circle cx="28" cy="26" r="10" fill="#fbbf24"/>
+  <!-- Cloud body -->
+  <ellipse cx="36" cy="38" rx="14" ry="9" fill="white" opacity="0.95"/>
+  <ellipse cx="26" cy="40" rx="9" ry="7" fill="white" opacity="0.95"/>
+  <ellipse cx="44" cy="40" rx="8" ry="6" fill="white" opacity="0.95"/>
+</svg>

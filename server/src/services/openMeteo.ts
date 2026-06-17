@@ -1,6 +1,23 @@
 import axios from 'axios';
 import type { SourceReading, ForecastDay, HourlyReading } from '../types/weather';
 
+function calculateMoonPhase(): string {
+  const now = new Date();
+  const knownNewMoon = new Date(Date.UTC(2000, 0, 6, 18, 14, 0));
+  const lunarCycleMs = 29.53058867 * 24 * 60 * 60 * 1000;
+  const elapsed = ((now.getTime() - knownNewMoon.getTime()) % lunarCycleMs + lunarCycleMs) % lunarCycleMs;
+  const dayAge = elapsed / (24 * 60 * 60 * 1000);
+  if (dayAge < 1.5)  return 'New Moon';
+  if (dayAge < 6.5)  return 'Waxing Crescent';
+  if (dayAge < 8.5)  return 'First Quarter';
+  if (dayAge < 13.5) return 'Waxing Gibbous';
+  if (dayAge < 16.5) return 'Full Moon';
+  if (dayAge < 21.5) return 'Waning Gibbous';
+  if (dayAge < 23.5) return 'Last Quarter';
+  if (dayAge < 28.5) return 'Waning Crescent';
+  return 'New Moon';
+}
+
 interface GeoResult {
   latitude: number;
   longitude: number;
@@ -91,6 +108,7 @@ export async function getCurrentWeather(city: string, coords?: { lat: number; lo
     precipitationMm: c.precipitation,
     sunriseTime: data.daily?.sunrise?.[0] ? formatSunTime(data.daily.sunrise[0]) : undefined,
     sunsetTime: data.daily?.sunset?.[0] ? formatSunTime(data.daily.sunset[0]) : undefined,
+    moonPhase: calculateMoonPhase(),
   };
 }
 
@@ -142,8 +160,9 @@ export async function getForecast(city: string, days: number = 7, coords?: { lat
   });
 }
 
-export async function getHourlyForecast(city: string, coords?: { lat: number; lon: number }): Promise<HourlyReading[]> {
+export async function getHourlyForecast(city: string, coords?: { lat: number; lon: number }, days = 2): Promise<HourlyReading[]> {
   const geo = coords ? { latitude: coords.lat, longitude: coords.lon } : await geocode(city);
+  const forecastDays = Math.min(Math.max(days, 2), 7);
 
   const { data } = await axios.get('https://api.open-meteo.com/v1/forecast', {
     params: {
@@ -155,7 +174,7 @@ export async function getHourlyForecast(city: string, coords?: { lat: number; lo
         'wind_speed_10m',
         'weather_code',
       ].join(','),
-      forecast_days: 2,
+      forecast_days: forecastDays,
       wind_speed_unit: 'kmh',
       timezone: 'auto',
     },
@@ -176,8 +195,30 @@ export async function getHourlyForecast(city: string, coords?: { lat: number; lo
         conditionCode,
       } satisfies HourlyReading;
     })
-    .filter((h: HourlyReading) => new Date(h.time) >= now)
-    .slice(0, 24);
+    .filter((h: HourlyReading) => new Date(h.time) >= now);
+}
+
+export async function getHistoricalDay(lat: number, lon: number, dateStr: string): Promise<{ high: number; low: number; condition: string } | null> {
+  try {
+    const { data } = await axios.get('https://archive-api.open-meteo.com/v1/archive', {
+      params: {
+        latitude: lat,
+        longitude: lon,
+        start_date: dateStr,
+        end_date: dateStr,
+        daily: ['temperature_2m_max', 'temperature_2m_min', 'weather_code'].join(','),
+        timezone: 'auto',
+      },
+    });
+
+    const d = data.daily;
+    if (!d?.time?.length) return null;
+
+    const { condition } = wmoCodeToCondition(d.weather_code[0]);
+    return { high: d.temperature_2m_max[0], low: d.temperature_2m_min[0], condition };
+  } catch {
+    return null;
+  }
 }
 
 export async function getYesterdaysActual(lat: number, lon: number): Promise<{ high: number; low: number; condition: string } | null> {

@@ -77,12 +77,15 @@ router.post('/', async (req: Request, res: Response) => {
     const answer = await askGroq(city, consensus, forecast, question, sanitizedHistory);
     res.json({ answer, city, question });
   } catch (err: any) {
-    console.error('Gemini error:', err);
-    if (err?.status === 429) {
-      return res.status(429).json({ error: 'AI quota exceeded — try again in a few seconds.' });
+    console.error('AI route error:', err);
+    if (err?.status === 429 || err?.response?.status === 429) {
+      return res.status(429).json({
+        error: 'rate_limited',
+        message: "AI is taking a breather — Groq's free tier limit was hit. Try again in a minute.",
+      });
     }
-    if (err?.status === 404) {
-      return res.status(503).json({ error: 'AI model unavailable — check GEMINI_API_KEY and model name.' });
+    if (err?.status === 404 || err?.response?.status === 404) {
+      return res.status(503).json({ error: 'AI model unavailable — check GROQ_API_KEY and model name.' });
     }
     res.status(500).json({ error: 'AI service unavailable' });
   }
