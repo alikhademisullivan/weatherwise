@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import SearchBar from './components/SearchBar';
 import ConfidenceBar from './components/ConfidenceBar';
@@ -61,14 +61,35 @@ function conditionBgClass(conditionCode?: string): string {
   return `wx-bg wx-${known.includes(code) ? code : 'unknown'}`;
 }
 
+// Read URL params on startup for ?city= / ?lat=&lon= deep-link support
+function readUrlParams(): { city: string; lat?: number; lon?: number } | null {
+  const params = new URLSearchParams(window.location.search);
+  const city = params.get('city');
+  const latStr = params.get('lat');
+  const lonStr = params.get('lon');
+  if (!city) return null;
+  const lat = latStr ? parseFloat(latStr) : undefined;
+  const lon = lonStr ? parseFloat(lonStr) : undefined;
+  return { city, lat: isNaN(lat as number) ? undefined : lat, lon: isNaN(lon as number) ? undefined : lon };
+}
+
 export default function App() {
-  const lastCity = localStorage.getItem('ww_last_city') ?? '';
+  const urlParams = readUrlParams();
+  const lastCity = urlParams?.city ?? localStorage.getItem('ww_last_city') ?? '';
+
   const [showWelcome, setShowWelcome] = useState(!lastCity);
   const [city, setCity] = useState(lastCity);
   const [searchValue, setSearchValue] = useState(lastCity);
-  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(
+    urlParams?.lat !== undefined && urlParams?.lon !== undefined
+      ? { lat: urlParams.lat, lon: urlParams.lon }
+      : null,
+  );
   const [showAccuracy, setShowAccuracy] = useState(false);
-  const [unit, setUnit] = useState<'C' | 'F'>('C');
+  // G1.1: persist unit across sessions
+  const [unit, setUnit] = useState<'C' | 'F'>(
+    () => (localStorage.getItem('ww-unit') as 'C' | 'F') ?? 'C',
+  );
   const [forecastView, setForecastView] = useState<ForecastView>('daily');
   const [forecastDays, setForecastDays] = useState<7 | 14>(7);
   const [chatOpen, setChatOpen] = useState(false);
@@ -79,8 +100,12 @@ export default function App() {
   const [isOffline, setIsOffline] = useState(
     () => new URLSearchParams(window.location.search).get('offline') === 'true' || !navigator.onLine
   );
+  // G4.27: compact view — secondary stats hidden until user expands
+  const [showMore, setShowMore] = useState(false);
+  // G4.28: CommuteMode collapsed by default
+  const [commuteOpen, setCommuteOpen] = useState(false);
 
-  // Keyboard shortcut ref for '/' → focus search
+  const scorecardRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { locations: savedLocations, save: saveLocation, remove: removeLocation, isSaved } = useSavedLocations();
@@ -102,18 +127,19 @@ export default function App() {
     setShowWelcome(false);
   });
 
-  // Apply / remove light-mode class on <html>
+  // G1.1: save unit preference
+  const changeUnit = useCallback((u: 'C' | 'F') => {
+    setUnit(u);
+    localStorage.setItem('ww-unit', u);
+  }, []);
+
   useEffect(() => {
     const html = document.documentElement;
-    if (theme === 'light') {
-      html.classList.add('light');
-    } else {
-      html.classList.remove('light');
-    }
+    if (theme === 'light') html.classList.add('light');
+    else html.classList.remove('light');
     localStorage.setItem('ww-theme', theme);
   }, [theme]);
 
-  // Online / offline detection
   useEffect(() => {
     const setOnline = () => setIsOffline(false);
     const setOffline = () => setIsOffline(true);
@@ -125,7 +151,6 @@ export default function App() {
     };
   }, []);
 
-  // Store city + timestamp in localStorage whenever weather loads successfully
   useEffect(() => {
     if (weather && city) {
       localStorage.setItem('ww_last_city', weather.location ?? city);
@@ -133,7 +158,6 @@ export default function App() {
     }
   }, [weather, city]);
 
-  // Press '/' anywhere to focus the search bar
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
@@ -146,12 +170,30 @@ export default function App() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  // G4.29: scroll scorecard into view when toggled on
+  const handleScorecardToggle = () => {
+    const next = !showAccuracy;
+    setShowAccuracy(next);
+    if (next) {
+      setTimeout(() => {
+        scorecardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+  };
+
   const conditionCode = weather?.consensus.sources[0]?.conditionCode;
   const mainIcon = conditionCodeToEmoji(conditionCode ?? 'unknown');
 
+  // G4.30: stagger index helper
+  const fadeClass = (_idx: number) =>
+    `animate-fadeIn opacity-0 [animation-fill-mode:forwards]`;
+  const fadeStyle = (idx: number): React.CSSProperties => ({
+    animationDelay: `${idx * 60}ms`,
+    animationDuration: '300ms',
+  });
+
   return (
     <>
-      {/* Animated background */}
       <div className={conditionBgClass(conditionCode)} aria-hidden="true" />
 
       <Routes>
@@ -160,7 +202,6 @@ export default function App() {
         <Route path="/404" element={<NotFoundPage />} />
         <Route path="/*" element={<>
 
-      {/* ─── WELCOME SCREEN ─── */}
       {showWelcome && (
         <WelcomeScreen
           onLocate={locate}
@@ -197,12 +238,12 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            {/* °C / °F toggle — always visible */}
+            {/* °C / °F toggle */}
             <div className="flex gap-0.5 bg-white/10 rounded-lg p-0.5">
               {(['C', 'F'] as const).map(u => (
                 <button
                   key={u}
-                  onClick={() => setUnit(u)}
+                  onClick={() => changeUnit(u)}
                   className={`px-2 sm:px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                     unit === u ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'
                   }`}
@@ -212,7 +253,7 @@ export default function App() {
               ))}
             </div>
 
-            {/* Theme toggle — always visible */}
+            {/* Theme toggle */}
             <button
               onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -249,7 +290,7 @@ export default function App() {
                   </div>
 
                   <button
-                    onClick={() => setShowAccuracy(v => !v)}
+                    onClick={handleScorecardToggle}
                     className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors flex items-center gap-1 ${
                       showAccuracy ? 'bg-white/20 text-white' : 'bg-white/10 text-white/50 hover:text-white/80'
                     }`}
@@ -278,14 +319,14 @@ export default function App() {
                     {isSaved(city) ? '★' : '☆'}
                   </button>
 
-                  <ShareCard consensus={weather.consensus} city={city} unit={unit} />
+                  <ShareCard consensus={weather.consensus} city={city} unit={unit} coords={coords ?? undefined} />
                 </>
               )}
             </div>
           </div>
         </div>
 
-        {/* Mobile-only sub-toolbar: forecast view + save */}
+        {/* Mobile sub-toolbar */}
         {weather && (
           <div className="sm:hidden px-3 pb-2 flex items-center gap-2">
             <div className="flex gap-0.5 bg-white/10 rounded-lg p-0.5">
@@ -340,7 +381,6 @@ export default function App() {
         />
       </header>
 
-      {/* Offline banner — slim, below header */}
       <OfflineBanner isOffline={isOffline} />
 
       {/* ─── MAIN CONTENT ─── */}
@@ -366,19 +406,26 @@ export default function App() {
           <div className="space-y-3">
 
             {alertsData && alertsData.alerts.length > 0 && (
-              <AlertsBanner alerts={alertsData.alerts} />
+              <div style={fadeStyle(0)} className={fadeClass(0)}>
+                <AlertsBanner alerts={alertsData.alerts} />
+              </div>
             )}
 
-            <SmartSummary
-              consensus={weather.consensus}
-              forecast={forecastData?.forecast}
-            />
+            {/* G4.25: SmartSummary at higher contrast */}
+            <div style={fadeStyle(1)} className={fadeClass(1)}>
+              <SmartSummary
+                consensus={weather.consensus}
+                forecast={forecastData?.forecast}
+                unit={unit}
+              />
+            </div>
 
             {/* ═══ HERO ROW ═══ */}
-            <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-5">
+            <div style={fadeStyle(2)} className={`${fadeClass(2)} rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-5`}>
+              {/* G4.26: On mobile, confidence/dispute section comes FIRST (before stats) via order classes */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
-                {/* Left: Temp + icon + city */}
+                {/* Left: Temp + icon */}
                 <div className="flex items-center gap-4">
                   <span className="text-6xl leading-none shrink-0" role="img" aria-label={weather.consensus.condition}>
                     {mainIcon}
@@ -397,11 +444,11 @@ export default function App() {
                       <span>📍</span>
                       <span className="truncate">{weather.location}</span>
                       <span className="text-white/25">·</span>
-                      <span className="text-white/35 text-xs shrink-0">
+                      <span className="text-white/40 text-xs shrink-0">
                         {weather.sources.length} source{weather.sources.length > 1 ? 's' : ''}
                       </span>
                     </div>
-                    <div className="text-white/25 text-xs mt-0.5">
+                    <div className="text-white/40 text-xs mt-0.5">
                       {new Date(weather.updatedAt).toLocaleTimeString()}
                       {weather.cached && ' · cached'}
                       {accuracyData?.usingDynamicWeights && ' · dynamic weights'}
@@ -409,16 +456,23 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Center: Source agreement */}
-                <div className="flex flex-col justify-center gap-3 md:border-x md:border-white/10 md:px-5 border-t border-white/10 pt-4 md:border-t-0 md:pt-0">
+                {/* Center: Source agreement — ORDER-FIRST on mobile so it's seen before the stats grid */}
+                <div className="flex flex-col justify-center gap-3 md:border-x md:border-white/10 md:px-5 border-t border-white/10 pt-4 md:border-t-0 md:pt-0 order-first md:order-none">
                   <ConfidenceBar score={weather.consensus.confidenceScore} />
                   {weather.consensus.isDisputed ? (
-                    <DisputeBadge spread={weather.consensus.spread} message={weather.consensus.disputeMessage} />
+                    <DisputeBadge
+                      spread={weather.consensus.spread}
+                      message={weather.consensus.disputeMessage}
+                      unit={unit}
+                    />
                   ) : (
-                    <p className="text-sm text-emerald-400/80 flex items-center gap-2">
-                      <span>✓</span>
-                      {weather.consensus.disputeMessage}
-                    </p>
+                    <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-2.5">
+                      <span className="text-emerald-400 text-lg leading-none">✓</span>
+                      <div>
+                        <p className="text-emerald-300 text-sm font-medium">Sources agree</p>
+                        <p className="text-emerald-400/60 text-xs mt-0.5">{weather.consensus.disputeMessage}</p>
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -430,9 +484,29 @@ export default function App() {
               </div>
             </div>
 
-            {/* ═══ COMMUTE MODE ═══ */}
+            {/* G3.21: Notification opt-in — outside the collapsed section, surfaces after load */}
+            <NotificationOptIn consensus={weather.consensus} city={city} />
+
+            {/* G4.28: CommuteMode — collapsible by default */}
             {hourlyData && hourlyData.hours.length > 0 && (
-              <CommuteMode hours={hourlyData.hours} unit={unit} />
+              <div style={fadeStyle(3)} className={fadeClass(3)}>
+                <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm overflow-hidden">
+                  <button
+                    onClick={() => setCommuteOpen(v => !v)}
+                    className="w-full flex items-center justify-between px-5 py-3 text-white/50 hover:text-white/70 transition-colors"
+                  >
+                    <span className="text-sm font-semibold text-white/60 uppercase tracking-wider">
+                      🚗 Commute Mode
+                    </span>
+                    <span className="text-xs text-white/30">{commuteOpen ? '▲ Collapse' : '▼ Expand'}</span>
+                  </button>
+                  {commuteOpen && (
+                    <div className="border-t border-white/8">
+                      <CommuteMode hours={hourlyData.hours} unit={unit} />
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
 
             {/* ═══ 2-COLUMN GRID ═══ */}
@@ -442,13 +516,14 @@ export default function App() {
               <div className="space-y-3">
                 {precipTimeline && precipTimeline.minutes.length > 0 && (
                   <ErrorBoundary>
-                    <PrecipTimeline data={precipTimeline} hours={extendedHourly?.hours} sources={weather.sources} />
+                    <div style={fadeStyle(4)} className={fadeClass(4)}>
+                      <PrecipTimeline data={precipTimeline} hours={extendedHourly?.hours} sources={weather.sources} />
+                    </div>
                   </ErrorBoundary>
                 )}
 
                 {forecastView === 'daily' && (
                   <>
-                    {/* 7 / 14 day toggle */}
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-white/40">Forecast range:</span>
                       <div className="flex gap-0.5 bg-white/10 rounded-lg p-0.5">
@@ -468,7 +543,9 @@ export default function App() {
 
                     {forecastData && !forecastLoading && (
                       <ErrorBoundary>
-                        <ForecastChart forecast={forecastData.forecast} unit={unit} days={forecastDays} />
+                        <div style={fadeStyle(5)} className={fadeClass(5)}>
+                          <ForecastChart forecast={forecastData.forecast} unit={unit} days={forecastDays} />
+                        </div>
                       </ErrorBoundary>
                     )}
                     {forecastLoading && <ForecastSkeleton label={`${forecastDays}-day forecast`} />}
@@ -490,12 +567,21 @@ export default function App() {
                 )}
 
                 <ErrorBoundary>
-                  <SourceBreakdown
-                    sources={weather.sources}
-                    consensus={weather.consensus}
-                    accuracy={accuracyData?.sources ?? []}
-                    unit={unit}
-                  />
+                  <div style={fadeStyle(6)} className={fadeClass(6)}>
+                    <SourceBreakdown
+                      sources={weather.sources}
+                      consensus={weather.consensus}
+                      accuracy={accuracyData?.sources ?? []}
+                      unit={unit}
+                      onViewScorecard={() => {
+                        setShowMore(true);
+                        setShowAccuracy(true);
+                        setTimeout(() => {
+                          scorecardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }, 80);
+                      }}
+                    />
+                  </div>
                 </ErrorBoundary>
               </div>
 
@@ -503,32 +589,59 @@ export default function App() {
               <div className="space-y-3">
                 {hourlyData && hourlyData.hours.length > 0 && (
                   <ErrorBoundary>
-                    <BestTimeWidget hours={hourlyData.hours} />
+                    <div style={fadeStyle(4)} className={fadeClass(4)}>
+                      <BestTimeWidget hours={hourlyData.hours} unit={unit} />
+                    </div>
                   </ErrorBoundary>
                 )}
 
-                {historicalData && (
-                  <ErrorBoundary>
-                    <HistoricalComparison
-                      data={historicalData}
-                      todayHigh={forecastData?.forecast[0]?.high}
-                      unit={unit}
-                    />
-                  </ErrorBoundary>
+                {/* G4.27: Secondary stats hidden until "Show more" is clicked */}
+                {showMore && (
+                  <>
+                    {historicalData && (
+                      <ErrorBoundary>
+                        <HistoricalComparison
+                          data={historicalData}
+                          todayHigh={forecastData?.forecast[0]?.high}
+                          unit={unit}
+                        />
+                      </ErrorBoundary>
+                    )}
+
+                    {showAccuracy && accuracyData && (
+                      <ErrorBoundary>
+                        <div ref={scorecardRef}>
+                          <AccuracyLeaderboard accuracy={accuracyData} />
+                        </div>
+                      </ErrorBoundary>
+                    )}
+
+                    {weather.consensus.airQualityIndex != null && weather.consensus.airQualityCategory && (
+                      <ErrorBoundary>
+                        <AirQuality
+                          aqi={weather.consensus.airQualityIndex}
+                          category={weather.consensus.airQualityCategory}
+                        />
+                      </ErrorBoundary>
+                    )}
+                  </>
                 )}
 
-                {showAccuracy && accuracyData && (
-                  <ErrorBoundary>
-                    <AccuracyLeaderboard accuracy={accuracyData} />
-                  </ErrorBoundary>
+                {!showMore && (
+                  <button
+                    onClick={() => setShowMore(true)}
+                    className="w-full text-xs text-white/40 hover:text-white/70 py-2 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/8 transition-colors"
+                  >
+                    ▼ Show historical data, air quality &amp; accuracy
+                  </button>
                 )}
 
-                {weather.consensus.airQualityIndex != null && weather.consensus.airQualityCategory && (
+                {/* Scorecard when showMore is false but manually toggled */}
+                {!showMore && showAccuracy && accuracyData && (
                   <ErrorBoundary>
-                    <AirQuality
-                      aqi={weather.consensus.airQualityIndex}
-                      category={weather.consensus.airQualityCategory}
-                    />
+                    <div ref={scorecardRef}>
+                      <AccuracyLeaderboard accuracy={accuracyData} />
+                    </div>
                   </ErrorBoundary>
                 )}
               </div>
@@ -556,8 +669,6 @@ export default function App() {
                     />
                   )}
 
-                  <NotificationOptIn consensus={weather.consensus} city={city} />
-
                   <CustomAlerts consensus={weather.consensus} city={city} />
 
                   <LocationFeedback city={city} coords={coords} summary={feedbackSummary} />
@@ -575,15 +686,15 @@ export default function App() {
             <div className="text-center space-y-2">
               <div className="text-5xl mb-3">🌍</div>
               <p className="text-white/80 font-semibold text-lg">Enter a city to get started</p>
-              <p className="text-white/40 text-sm max-w-sm mx-auto">
+              <p className="text-white/50 text-sm max-w-sm mx-auto">
                 WeatherWise pulls from multiple forecast sources and shows you how much they agree — so you know when to trust the forecast.
               </p>
-              <p className="text-white/25 text-xs mt-2">Tip: Press <kbd className="bg-white/10 px-1.5 py-0.5 rounded text-white/40">/</kbd> to search</p>
+              <p className="text-white/30 text-xs mt-2">Tip: Press <kbd className="bg-white/10 px-1.5 py-0.5 rounded text-white/40">/</kbd> to search</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               {[
                 { icon: '📊', title: 'Source Scorecard', desc: 'See which service is actually accurate in your city, tracked over time.' },
-                { icon: '🤝', title: 'Consensus Engine', desc: 'When sources agree, confidence is high. When they split, we flag it.' },
+                { icon: '🤝', title: 'Multi-Source Forecast', desc: 'When sources agree, confidence is high. When they split, we flag it.' },
                 { icon: '🎯', title: 'Honest Forecasts', desc: 'Days 1–3 show precise temps. Day 7+ shows only a trend — because precision there is fiction.' },
                 { icon: '🤖', title: 'Ask AI', desc: 'Ask "Should I run today?" and get a plain-English answer grounded in real data.' },
               ].map(f => (
@@ -591,7 +702,7 @@ export default function App() {
                   <span className="text-xl shrink-0">{f.icon}</span>
                   <div>
                     <p className="text-white/70 font-medium">{f.title}</p>
-                    <p className="text-white/35 text-xs mt-0.5">{f.desc}</p>
+                    <p className="text-white/45 text-xs mt-0.5">{f.desc}</p>
                   </div>
                 </div>
               ))}
@@ -601,13 +712,12 @@ export default function App() {
 
       </div>
 
-      {/* Feedback widget — bottom-left, above nav */}
       <FeedbackWidget />
 
-      {/* AI Chat FAB — bottom-right, above nav */}
       <button
         onClick={() => setChatOpen(true)}
         className="fixed bottom-20 right-4 sm:bottom-24 sm:right-6 bg-blue-500 hover:bg-blue-600 text-white rounded-full px-4 py-2.5 sm:px-5 sm:py-3 shadow-lg text-sm font-medium transition-colors z-40"
+        aria-label="Ask AI about today's weather"
       >
         Ask AI
       </button>

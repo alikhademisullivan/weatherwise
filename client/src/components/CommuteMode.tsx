@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { HourlyReading } from '../types/weather';
-import { formatTemp, conditionCodeToEmoji } from '../utils/formatters';
+import { formatTemp, conditionCodeToEmoji, formatWind } from '../utils/formatters';
 
 interface CommuteTimes {
   morning: string;
@@ -99,7 +99,7 @@ function CommuteCard({
         </div>
         <div className="bg-white/5 rounded-lg px-2.5 py-1.5">
           <span className="text-white/40">Wind</span>
-          <span className="ml-1 text-white/70 font-medium">{Math.round(hour.windSpeed)} km/h</span>
+          <span className="ml-1 text-white/70 font-medium">{formatWind(hour.windSpeed, unit)}</span>
         </div>
       </div>
 
@@ -128,9 +128,9 @@ export default function CommuteMode({ hours, unit }: Props) {
   }
 
   return (
-    <div className="rounded-2xl bg-white/8 border border-white/15 backdrop-blur-sm p-5 space-y-4">
+    <div className="p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">Commute Mode</h2>
+        <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">Commute Times</h2>
         <button
           onClick={() => { setDraft(times); setEditing(v => !v); }}
           className="text-xs bg-white/10 hover:bg-white/15 text-white/60 px-2.5 py-1 rounded-lg transition-colors"
@@ -183,7 +183,7 @@ export default function CommuteMode({ hours, unit }: Props) {
         </div>
       )}
 
-      <p className="text-white/20 text-xs text-center">
+      <p className="text-white/40 text-xs text-center">
         Showing weather at your saved commute times · tap ⚙ to adjust
       </p>
     </div>

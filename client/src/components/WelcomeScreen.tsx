@@ -63,18 +63,26 @@ export default function WelcomeScreen({ onLocate, onSearch, locating, geoError }
         />
       </div>
 
+      {/* Demo link */}
+      <button
+        onClick={() => onSearch('Toronto')}
+        className="mt-6 text-xs text-white/35 hover:text-white/60 underline underline-offset-2 transition-colors"
+      >
+        Try Toronto →
+      </button>
+
       {/* Feature tiles */}
-      <div className="grid grid-cols-2 gap-3 mt-12 w-full max-w-md">
+      <div className="grid grid-cols-2 gap-3 mt-6 w-full max-w-md">
         {[
           { icon: '📊', title: 'Source Scorecard', desc: 'Track which service is most accurate in your city.' },
-          { icon: '🤝', title: 'Consensus Engine', desc: 'See when forecasters agree — or when they split.' },
+          { icon: '🤝', title: 'Forecast Agreement', desc: 'See when forecasters agree — or when they split.' },
           { icon: '🎯', title: 'Honest Forecasts', desc: 'Precision only where the data actually supports it.' },
           { icon: '🤖', title: 'Ask AI', desc: 'Plain-English answers grounded in real forecast data.' },
         ].map(f => (
           <div key={f.title} className="bg-white/5 border border-white/8 rounded-xl p-4">
             <span className="text-2xl">{f.icon}</span>
             <p className="text-white/75 font-semibold text-xs mt-2">{f.title}</p>
-            <p className="text-white/35 text-[11px] mt-1 leading-relaxed">{f.desc}</p>
+            <p className="text-white/55 text-[11px] mt-1 leading-relaxed">{f.desc}</p>
           </div>
         ))}
       </div>

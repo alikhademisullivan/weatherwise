@@ -180,6 +180,22 @@ export default function AboutPage() {
           </div>
         </section>
 
+        {/* ── Privacy ── */}
+        <section className="rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm px-8 py-8">
+          <h2 className="text-lg font-semibold text-white mb-4">Privacy</h2>
+          <div className="space-y-3 text-white/55 text-sm leading-relaxed">
+            <p>
+              WeatherWise does not sell your data and does not show ads.
+            </p>
+            <ul className="space-y-2 list-none">
+              <li className="flex gap-2"><span className="text-white/30 shrink-0">·</span><span><strong className="text-white/70">Location</strong> — used only to fetch your local forecast. Never stored on our servers without your explicit sign-in.</span></li>
+              <li className="flex gap-2"><span className="text-white/30 shrink-0">·</span><span><strong className="text-white/70">AI chat</strong> — messages are sent to Groq (LLaMA) to generate responses. Do not include personal or sensitive information.</span></li>
+              <li className="flex gap-2"><span className="text-white/30 shrink-0">·</span><span><strong className="text-white/70">Analytics</strong> — optional, anonymised page-view data via PostHog (only active when a key is configured).</span></li>
+              <li className="flex gap-2"><span className="text-white/30 shrink-0">·</span><span><strong className="text-white/70">Preferences</strong> — temperature unit, commute times, and last searched city are stored locally in your browser only.</span></li>
+            </ul>
+          </div>
+        </section>
+
         {/* ── Footer ── */}
         <p className="text-center text-white/25 text-xs">
           WeatherWise · Free · No ads · No account required ·{' '}

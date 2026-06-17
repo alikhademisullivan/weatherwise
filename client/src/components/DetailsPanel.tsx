@@ -1,5 +1,5 @@
 import type { ConsensusReading, HourlyReading, SourceReading } from '../types/weather';
-import { celsiusToFahrenheit, formatTemp, degreesToCompass, uvRisk, dayLength } from '../utils/formatters';
+import { celsiusToFahrenheit, formatTemp, degreesToCompass, uvRisk, dayLength, formatWind, kphToMph, windSpeedUnit } from '../utils/formatters';
 import StatTooltip from './StatTooltip';
 
 interface Props {
@@ -124,8 +124,8 @@ export default function DetailsPanel({ consensus, unit, mode = 'details', hourly
 
   if (mode === 'hero') {
     const windValue = consensus.windDirection != null
-      ? `${consensus.windSpeed} km/h ${degreesToCompass(consensus.windDirection)}`
-      : `${consensus.windSpeed} km/h`;
+      ? `${formatWind(consensus.windSpeed, unit)} ${degreesToCompass(consensus.windDirection)}`
+      : formatWind(consensus.windSpeed, unit);
 
     // ── Feels Like ──────────────────────────────────────────────────────────
     const flRaw = buildSources(consensus.sources, consensus.feelsLike, s => s.feelsLike);
@@ -145,11 +145,12 @@ export default function DetailsPanel({ consensus, unit, mode = 'details', hourly
 
     // ── Wind ────────────────────────────────────────────────────────────────
     const windSources = buildSources(consensus.sources, consensus.windSpeed, s => s.windSpeed)
-      .map(s => ({ ...s, value: Math.round(s.value) }));
+      .map(s => ({ ...s, value: Math.round(unit === 'F' ? kphToMph(s.value) : s.value) }));
     const windSpread = spreadOf(windSources.map(s => s.value));
-    const gustInfo = consensus.windGust ? ` · Gusts up to ${consensus.windGust} km/h` : '';
-    const windInterp = `Sources within ${windSpread} km/h${gustInfo}`;
-    const windTrend = computeTrend(hourly, h => h.windSpeed, ' km/h', 5);
+    const wUnit = windSpeedUnit(unit);
+    const gustInfo = consensus.windGust ? ` · Gusts up to ${formatWind(consensus.windGust, unit)}` : '';
+    const windInterp = `Sources within ${windSpread}${wUnit}${gustInfo}`;
+    const windTrend = computeTrend(hourly, h => unit === 'F' ? kphToMph(h.windSpeed) : h.windSpeed, windSpeedUnit(unit), unit === 'F' ? 3 : 5);
 
     // ── Precipitation ───────────────────────────────────────────────────────
     const precipSources = buildSources(
@@ -186,15 +187,15 @@ export default function DetailsPanel({ consensus, unit, mode = 'details', hourly
         </StatTooltip>
 
         <StatTooltip
-          label="Wind" unit=" km/h"
-          value={Math.round(consensus.windSpeed)}
+          label="Wind" unit={windSpeedUnit(unit)}
+          value={Math.round(unit === 'F' ? kphToMph(consensus.windSpeed) : consensus.windSpeed)}
           sources={windSources} interpretation={windInterp}
           trend={windTrend?.trend} trendLabel={windTrend?.trendLabel}
         >
           <Tile
             icon="💨" label="Wind"
             value={windValue}
-            sub={consensus.windGust != null ? `Gusts ${consensus.windGust} km/h` : undefined}
+            sub={consensus.windGust != null ? `Gusts ${formatWind(consensus.windGust, unit)}` : undefined}
             warn={fs?.windSpeed != null && fs.windSpeed > 15}
             hasTooltip
           />

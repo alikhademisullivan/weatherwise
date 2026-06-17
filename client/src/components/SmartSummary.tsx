@@ -1,24 +1,24 @@
 import type { ConsensusReading, ForecastDay } from '../types/weather';
-import { degreesToCompass } from '../utils/formatters';
+import { degreesToCompass, formatWind } from '../utils/formatters';
 
 interface Props {
   consensus: ConsensusReading;
   forecast?: ForecastDay[];
+  unit?: 'C' | 'F';
 }
 
-function generateSummary(consensus: ConsensusReading, forecast?: ForecastDay[]): string {
+function generateSummary(consensus: ConsensusReading, unit: 'C' | 'F', forecast?: ForecastDay[]): string {
   const parts: string[] = [];
 
-  // Confidence lead
   if (consensus.confidenceScore >= 80) {
     parts.push('Sources strongly agree on today\'s forecast.');
   } else if (consensus.isDisputed) {
-    parts.push(`Sources are split — temperatures vary by up to ${consensus.spread}°C across providers.`);
+    const spreadDisplay = unit === 'F' ? (consensus.spread * 9 / 5).toFixed(1) : consensus.spread.toFixed(1);
+    parts.push(`Sources are split — temperatures vary by up to ${spreadDisplay}°${unit} across providers.`);
   } else {
     parts.push('Sources are in reasonable agreement today.');
   }
 
-  // Temperature + condition tone
   const temp = consensus.temperature;
   let tempTone = '';
   if (temp >= 30) tempTone = 'Hot conditions';
@@ -41,7 +41,6 @@ function generateSummary(consensus: ConsensusReading, forecast?: ForecastDay[]):
 
   parts.push(`${tempTone}${condNote ? ' ' + condNote : ''}.`);
 
-  // UV/wind/tomorrow
   const advisories: string[] = [];
 
   if (consensus.uvIndex != null && consensus.uvIndex >= 6) {
@@ -49,10 +48,10 @@ function generateSummary(consensus: ConsensusReading, forecast?: ForecastDay[]):
   }
   if (consensus.windSpeed > 40) {
     const dir = consensus.windDirection != null ? ` from the ${degreesToCompass(consensus.windDirection)}` : '';
-    advisories.push(`Strong winds at ${consensus.windSpeed} km/h${dir}`);
+    advisories.push(`Strong winds at ${formatWind(consensus.windSpeed, unit)}${dir}`);
   } else if (consensus.windSpeed > 20) {
     const dir = consensus.windDirection != null ? ` from the ${degreesToCompass(consensus.windDirection)}` : '';
-    advisories.push(`Breezy at ${consensus.windSpeed} km/h${dir}`);
+    advisories.push(`Breezy at ${formatWind(consensus.windSpeed, unit)}${dir}`);
   }
 
   if (forecast && forecast.length > 1) {
@@ -77,12 +76,13 @@ function generateSummary(consensus: ConsensusReading, forecast?: ForecastDay[]):
   return parts.join(' ');
 }
 
-export default function SmartSummary({ consensus, forecast }: Props) {
-  const summary = generateSummary(consensus, forecast);
+export default function SmartSummary({ consensus, forecast, unit = 'C' }: Props) {
+  const summary = generateSummary(consensus, unit, forecast);
 
   return (
+    // G4.25: raised from text-white/60 to text-white/80 for prominence
     <div className="rounded-2xl bg-white/5 border border-white/10 px-5 py-3">
-      <p className="text-white/60 text-sm leading-relaxed">{summary}</p>
+      <p className="text-white/80 text-sm leading-relaxed">{summary}</p>
     </div>
   );
 }

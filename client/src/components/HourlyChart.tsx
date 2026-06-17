@@ -10,7 +10,7 @@ import {
   Legend,
 } from 'recharts';
 import type { HourlyReading } from '../types/weather';
-import { celsiusToFahrenheit, conditionCodeToEmoji } from '../utils/formatters';
+import { celsiusToFahrenheit, conditionCodeToEmoji, formatWind } from '../utils/formatters';
 
 interface Props {
   hours: HourlyReading[];
@@ -21,7 +21,7 @@ function formatHour(isoTime: string) {
   return new Date(isoTime).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
 }
 
-function CustomTooltip({ active, payload }: { active?: boolean; payload?: any[] }) {
+function CustomTooltip({ active, payload, unit }: { active?: boolean; payload?: any[]; unit?: 'C' | 'F' }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload as HourlyReading & { label: string; temp: number };
   return (
@@ -30,7 +30,7 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: any[] 
       <p className="text-orange-300">{conditionCodeToEmoji(d.conditionCode)} {d.condition}</p>
       <p className="text-white">{Math.round(d.temp)}°</p>
       <p className="text-cyan-300">Rain: {d.precipitationProbability}%</p>
-      <p className="text-white/60">Wind: {d.windSpeed} km/h</p>
+      <p className="text-white/60">Wind: {formatWind(d.windSpeed, unit ?? 'C')}</p>
     </div>
   );
 }
@@ -66,7 +66,7 @@ export default function HourlyChart({ hours, unit }: Props) {
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
           <XAxis dataKey="label" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} axisLine={false} tickLine={false} interval={2} />
           <YAxis tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} axisLine={false} tickLine={false} unit="°" />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={<CustomTooltip unit={unit} />} />
           <Legend wrapperStyle={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }} />
           <Bar dataKey="precipitationProbability" name="Rain %" fill="rgba(56,189,248,0.2)" radius={[3, 3, 0, 0]} />
           <Line type="monotone" dataKey="temp" name="Temp" stroke="#fb923c" strokeWidth={2} dot={false} />

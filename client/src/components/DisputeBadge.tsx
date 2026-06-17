@@ -1,10 +1,14 @@
 
 interface Props {
-  spread: number;
+  spread: number;   // always in °C from API
   message: string;
+  unit?: 'C' | 'F';
 }
 
-export default function DisputeBadge({ spread, message }: Props) {
+export default function DisputeBadge({ spread, message, unit = 'C' }: Props) {
+  // G1.3: convert spread to display unit
+  const displaySpread = unit === 'F' ? spread * 9 / 5 : spread;
+  const unitLabel = `°${unit}`;
   const isHigh = spread > 5;
 
   return (
@@ -21,9 +25,15 @@ export default function DisputeBadge({ spread, message }: Props) {
       <div>
         <p className="font-semibold text-sm">
           {isHigh ? 'High Uncertainty' : 'Forecast Disputed'}
-          <span className="ml-2 font-normal opacity-75">({spread.toFixed(1)}°C spread)</span>
+          <span className="ml-2 font-normal opacity-75">
+            ({displaySpread.toFixed(1)}{unitLabel} spread)
+          </span>
         </p>
         <p className="text-sm opacity-85 mt-0.5">{message}</p>
+        {/* G3.14: action hint */}
+        <p className="text-xs opacity-55 mt-1.5">
+          Check back in an hour — sources often converge as the day progresses.
+        </p>
       </div>
     </div>
   );

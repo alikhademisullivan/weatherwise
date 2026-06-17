@@ -91,6 +91,17 @@
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
 }
 
+/* ── Staggered fade-in for dashboard components ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn {
+  animation-name: fadeIn;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+
 /* Thin scrollbar for hour strip */
 .scrollbar-thin::-webkit-scrollbar { height: 4px; }
 .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
