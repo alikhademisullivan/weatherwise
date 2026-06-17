@@ -187,4 +187,6 @@ export interface PrecipTimelineResponse {
   source: string;
   updatedAt: string;
   cached?: boolean;
+  fallback?: boolean;
+  message?: string;
 }

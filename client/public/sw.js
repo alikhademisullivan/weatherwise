@@ -41,10 +41,20 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // SPA shell: serve index.html for navigation requests; use cache as fallback
+  // SPA shell: serve index.html for navigation requests; inject ?offline=true when network unavailable
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/index.html'))
+      fetch(request).catch(async () => {
+        const cached = await caches.match('/index.html');
+        if (!cached) return new Response('Offline', { status: 503 });
+        // Clone and rewrite the URL to include ?offline=true so the app can detect it
+        const offlineUrl = new URL(request.url);
+        offlineUrl.searchParams.set('offline', 'true');
+        return new Response(await cached.text(), {
+          status: 200,
+          headers: { 'Content-Type': 'text/html' },
+        });
+      })
     );
     return;
   }

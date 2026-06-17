@@ -1,15 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <defs>
-    <radialGradient id="sky" cx="50%" cy="40%" r="60%">
-      <stop offset="0%" stop-color="#38bdf8"/>
-      <stop offset="100%" stop-color="#0369a1"/>
-    </radialGradient>
-  </defs>
-  <circle cx="50" cy="50" r="50" fill="url(#sky)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Dark background circle -->
+  <circle cx="32" cy="32" r="32" fill="#1e3a5f"/>
   <!-- Sun -->
-  <circle cx="50" cy="38" r="14" fill="#fde047"/>
-  <!-- Cloud -->
-  <ellipse cx="44" cy="58" rx="18" ry="11" fill="white" opacity="0.95"/>
-  <ellipse cx="58" cy="60" rx="14" ry="9" fill="white" opacity="0.95"/>
-  <ellipse cx="50" cy="63" rx="20" ry="10" fill="white" opacity="0.95"/>
+  <circle cx="28" cy="26" r="10" fill="#fbbf24"/>
+  <!-- Cloud body -->
+  <ellipse cx="36" cy="38" rx="14" ry="9" fill="white" opacity="0.95"/>
+  <ellipse cx="26" cy="40" rx="9" ry="7" fill="white" opacity="0.95"/>
+  <ellipse cx="44" cy="40" rx="8" ry="6" fill="white" opacity="0.95"/>
 </svg>

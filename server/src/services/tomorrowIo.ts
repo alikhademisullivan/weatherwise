@@ -113,7 +113,7 @@ export async function getPrecipTimeline(city: string, coords?: { lat: number; lo
 
   const geo = coords ? { lat: coords.lat, lon: coords.lon } : await geocode(city);
 
-  const { data } = await axios.get('https://api.tomorrow.io/v4/timelines', {
+  const timelineRes = await axios.get('https://api.tomorrow.io/v4/timelines', {
     params: {
       location: `${geo.lat},${geo.lon}`,
       fields: ['precipitationProbability', 'precipitationIntensity'].join(','),
@@ -121,7 +121,14 @@ export async function getPrecipTimeline(city: string, coords?: { lat: number; lo
       units: 'metric',
       apikey: apiKey,
     },
+    validateStatus: status => status < 500,
   });
+
+  if (timelineRes.status === 429) {
+    throw new Error('TOMORROW_RATE_LIMITED');
+  }
+
+  const { data } = timelineRes;
 
   const timeline = data.data?.timelines?.[0];
   if (!timeline) return [];

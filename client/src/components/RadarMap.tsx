@@ -22,6 +22,7 @@ export default function RadarMap({ city, lat: propLat, lon: propLon }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<L.Map | null>(null);
   const radarLayer = useRef<L.TileLayer | null>(null);
+  const baseTileLayer = useRef<L.TileLayer | null>(null);
 
   const [radarData, setRadarData] = useState<RainViewerData | null>(null);
   const [frameIdx, setFrameIdx] = useState(0);
@@ -30,8 +31,12 @@ export default function RadarMap({ city, lat: propLat, lon: propLon }: Props) {
   const [resolvedCoords, setResolvedCoords] = useState<{ lat: number; lon: number } | null>(
     propLat != null && propLon != null ? { lat: propLat, lon: propLon } : null,
   );
+  const [showTwoFingerHint, setShowTwoFingerHint] = useState(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   // Resolve coordinates if not provided
   useEffect(() => {
@@ -60,6 +65,16 @@ export default function RadarMap({ city, lat: propLat, lon: propLon }: Props) {
       .catch(() => setLoading(false));
   }, []);
 
+  // Show two-finger hint on mobile when component mounts
+  useEffect(() => {
+    if (!isMobile) return;
+    setShowTwoFingerHint(true);
+    hintTimerRef.current = setTimeout(() => setShowTwoFingerHint(false), 3000);
+    return () => {
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    };
+  }, [isMobile]);
+
   // Initialise Leaflet map once the div is mounted and coords are known
   useEffect(() => {
     if (!mapRef.current || !resolvedCoords) return;
@@ -70,26 +85,52 @@ export default function RadarMap({ city, lat: propLat, lon: propLon }: Props) {
       return;
     }
 
+    const isLight = document.documentElement.classList.contains('light');
+    const tileUrl = isLight
+      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+
     const map = L.map(mapRef.current, {
       center: [resolvedCoords.lat, resolvedCoords.lon],
       zoom: 9,
       zoomControl: true,
       attributionControl: true,
+      // Disable drag on mobile to avoid hijacking page scroll
+      dragging: !isMobile,
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    if (isMobile) {
+      // Disable legacy tap handler (if present) to avoid conflicts
+      (map as any).tap?.disable();
+      // Keep pinch-to-zoom working on mobile
+      map.scrollWheelZoom.enable();
+    }
+
+    baseTileLayer.current = L.tileLayer(tileUrl, {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
       subdomains: 'abcd',
       maxZoom: 20,
-    }).addTo(map);
+    });
+    baseTileLayer.current.addTo(map);
 
     leafletMap.current = map;
 
     return () => {
       map.remove();
       leafletMap.current = null;
+      baseTileLayer.current = null;
     };
-  }, [resolvedCoords]);
+  }, [resolvedCoords, isMobile]);
+
+  // Swap base tile layer when theme changes
+  useEffect(() => {
+    if (!leafletMap.current || !baseTileLayer.current) return;
+    const isLight = document.documentElement.classList.contains('light');
+    const newUrl = isLight
+      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+    baseTileLayer.current.setUrl(newUrl);
+  });
 
   // Swap radar tile layer when frame or data changes
   useEffect(() => {
@@ -130,6 +171,11 @@ export default function RadarMap({ city, lat: propLat, lon: propLon }: Props) {
     ? new Date(currentFrame.time * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
     : '';
 
+  function dismissHint() {
+    setShowTwoFingerHint(false);
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+  }
+
   return (
     <div className="rounded-2xl overflow-hidden border border-white/10">
       {/* Toolbar */}
@@ -161,8 +207,33 @@ export default function RadarMap({ city, lat: propLat, lon: propLon }: Props) {
         </div>
       </div>
 
-      {/* Map */}
-      <div ref={mapRef} style={{ height: 300, width: '100%', background: '#0f172a' }} />
+      {/* Map container */}
+      <div className="relative">
+        <div
+          ref={mapRef}
+          style={{
+            height: 300,
+            width: '100%',
+            background: '#0f172a',
+            touchAction: isMobile ? 'pan-y' : 'auto',
+          }}
+        />
+
+        {/* Two-finger hint overlay (mobile only) */}
+        {isMobile && showTwoFingerHint && (
+          <div
+            className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-center pointer-events-none"
+            aria-live="polite"
+          >
+            <div
+              className="bg-black/60 backdrop-blur-sm text-white text-xs font-medium px-4 py-2 rounded-full pointer-events-auto"
+              onClick={dismissHint}
+            >
+              Use two fingers to move the map
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Frame scrubber */}
       {frames.length > 1 && (

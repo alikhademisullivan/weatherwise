@@ -47,6 +47,11 @@ export default function PrecipTimeline({ data }: Props) {
         <div>
           <h3 className="text-white/80 text-sm font-semibold">Precipitation — Next 24h</h3>
           <p className="text-white/40 text-xs mt-0.5">{subtitle}</p>
+          {data.fallback && (
+            <span className="inline-flex items-center gap-1 mt-1 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-full px-2 py-0.5">
+              ⚡ Showing hourly estimates — minute data temporarily unavailable
+            </span>
+          )}
         </div>
         <span className="text-2xl">{peakProb >= 70 ? '🌧️' : peakProb >= 30 ? '🌦️' : '☀️'}</span>
       </div>

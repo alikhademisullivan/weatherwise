@@ -311,6 +311,24 @@ router.get('/precipitation-timeline', async (req: Request, res: Response) => {
   const cached = getCached<any>(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
 
+  // Try Tomorrow.io minute-by-minute first; fall back to Open-Meteo hourly on rate-limit
+  if (process.env.TOMORROW_IO_API_KEY) {
+    try {
+      const minutes = await tomorrowIo.getPrecipTimeline(city, coords);
+      const response = { city, minutes, source: 'Tomorrow.io', updatedAt: new Date().toISOString() };
+      setCached(cacheKey, response);
+      return res.json(response);
+    } catch (err: any) {
+      if (err?.message === 'TOMORROW_RATE_LIMITED') {
+        // Fall through to Open-Meteo hourly fallback below
+        console.warn('[precip-timeline] Tomorrow.io rate limited — using Open-Meteo fallback');
+      } else {
+        console.warn('[precip-timeline] Tomorrow.io failed:', err?.message);
+        // Also fall through to Open-Meteo
+      }
+    }
+  }
+
   try {
     const hours = await openMeteo.getHourlyForecast(city, coords);
     const minutes = hours.map(h => ({
@@ -319,7 +337,14 @@ router.get('/precipitation-timeline', async (req: Request, res: Response) => {
       precipIntensity: 0,
     }));
 
-    const response = { city, minutes, source: 'Open-Meteo', updatedAt: new Date().toISOString() };
+    const response = {
+      city,
+      minutes,
+      source: 'Open-Meteo',
+      fallback: true,
+      message: 'Minute-by-minute data temporarily unavailable — showing hourly data instead.',
+      updatedAt: new Date().toISOString(),
+    };
     setCached(cacheKey, response);
     return res.json(response);
   } catch (err: any) {

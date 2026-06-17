@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Routes, Route, Link } from 'react-router-dom';
 import SearchBar from './components/SearchBar';
 import ConfidenceBar from './components/ConfidenceBar';
 import DisputeBadge from './components/DisputeBadge';
@@ -24,6 +25,9 @@ import WeekendPlanner from './components/WeekendPlanner';
 import CommuteMode from './components/CommuteMode';
 import CustomAlerts from './components/CustomAlerts';
 import DigestSubscribe from './components/DigestSubscribe';
+import ErrorBoundary from './components/ErrorBoundary';
+import OfflineBanner from './components/OfflineBanner';
+import AboutPage from './components/AboutPage';
 import { conditionCodeToEmoji, formatTemp } from './utils/formatters';
 import {
   useCurrentWeather,
@@ -65,6 +69,9 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem('ww-theme') as Theme) ?? 'dark'
   );
+  const [isOffline, setIsOffline] = useState(
+    () => new URLSearchParams(window.location.search).get('offline') === 'true' || !navigator.onLine
+  );
 
   // Keyboard shortcut ref for '/' → focus search
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -98,6 +105,26 @@ export default function App() {
     localStorage.setItem('ww-theme', theme);
   }, [theme]);
 
+  // Online / offline detection
+  useEffect(() => {
+    const setOnline = () => setIsOffline(false);
+    const setOffline = () => setIsOffline(true);
+    window.addEventListener('online', setOnline);
+    window.addEventListener('offline', setOffline);
+    return () => {
+      window.removeEventListener('online', setOnline);
+      window.removeEventListener('offline', setOffline);
+    };
+  }, []);
+
+  // Store city + timestamp in localStorage whenever weather loads successfully
+  useEffect(() => {
+    if (weather && city) {
+      localStorage.setItem('ww_last_city', weather.location ?? city);
+      localStorage.setItem('ww_last_updated', new Date().toISOString());
+    }
+  }, [weather, city]);
+
   // Press '/' anywhere to focus the search bar
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -119,10 +146,14 @@ export default function App() {
       {/* Animated background */}
       <div className={conditionBgClass(conditionCode)} aria-hidden="true" />
 
+      <Routes>
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/*" element={<>
+
       {/* ─── STICKY HEADER ─── */}
       <header className="sticky top-0 z-30 bg-black/25 backdrop-blur-md border-b border-white/10">
         <div className="max-w-[1400px] mx-auto px-4 h-14 flex items-center gap-3">
-          <span className="text-white font-bold text-lg tracking-tight shrink-0">WeatherWise</span>
+          <Link to="/" className="text-white font-bold text-lg tracking-tight shrink-0 hover:text-white/80 transition-colors">WeatherWise</Link>
 
           <div className="flex-1 min-w-0">
             <SearchBar
@@ -136,6 +167,14 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* About link */}
+            <Link
+              to="/about"
+              className="text-xs px-2.5 py-1 rounded-lg text-white/50 hover:text-white/80 transition-colors hidden sm:block"
+            >
+              About
+            </Link>
+
             {/* °C / °F toggle */}
             <div className="flex gap-0.5 bg-white/10 rounded-lg p-0.5">
               {(['C', 'F'] as const).map(u => (
@@ -225,6 +264,9 @@ export default function App() {
           onRemove={removeLocation}
         />
       </header>
+
+      {/* Offline banner — slim, below header */}
+      <OfflineBanner isOffline={isOffline} />
 
       {/* ─── MAIN CONTENT ─── */}
       <div className="max-w-[1400px] mx-auto px-4 pt-4 pb-20">
@@ -324,7 +366,9 @@ export default function App() {
               {/* Left column (60%) */}
               <div className="space-y-3">
                 {precipTimeline && precipTimeline.minutes.length > 0 && (
-                  <PrecipTimeline data={precipTimeline} />
+                  <ErrorBoundary>
+                    <PrecipTimeline data={precipTimeline} />
+                  </ErrorBoundary>
                 )}
 
                 {forecastView === 'daily' && (
@@ -348,7 +392,9 @@ export default function App() {
                     </div>
 
                     {forecastData && !forecastLoading && (
-                      <ForecastChart forecast={forecastData.forecast} unit={unit} days={forecastDays} />
+                      <ErrorBoundary>
+                        <ForecastChart forecast={forecastData.forecast} unit={unit} days={forecastDays} />
+                      </ErrorBoundary>
                     )}
                     {forecastLoading && <ForecastSkeleton label={`${forecastDays}-day forecast`} />}
                   </>
@@ -359,48 +405,62 @@ export default function App() {
                 )}
 
                 {forecastView === 'radar' && (
-                  <RadarMap city={city} lat={coords?.lat} lon={coords?.lon} />
+                  <ErrorBoundary>
+                    <RadarMap city={city} lat={coords?.lat} lon={coords?.lon} />
+                  </ErrorBoundary>
                 )}
 
                 {forecastView === 'weekend' && forecastData && (
-                  <WeekendPlanner
-                    forecast={forecastData.forecast}
-                    hourly={extendedHourly?.hours ?? []}
-                    unit={unit}
-                  />
+                  <ErrorBoundary>
+                    <WeekendPlanner
+                      forecast={forecastData.forecast}
+                      hourly={extendedHourly?.hours ?? []}
+                      unit={unit}
+                    />
+                  </ErrorBoundary>
                 )}
 
-                <SourceBreakdown
-                  sources={weather.sources}
-                  consensus={weather.consensus}
-                  accuracy={accuracyData?.sources ?? []}
-                  unit={unit}
-                />
+                <ErrorBoundary>
+                  <SourceBreakdown
+                    sources={weather.sources}
+                    consensus={weather.consensus}
+                    accuracy={accuracyData?.sources ?? []}
+                    unit={unit}
+                  />
+                </ErrorBoundary>
               </div>
 
               {/* Right column (40%) */}
               <div className="space-y-3">
                 {hourlyData && hourlyData.hours.length > 0 && (
-                  <BestTimeWidget hours={hourlyData.hours} />
+                  <ErrorBoundary>
+                    <BestTimeWidget hours={hourlyData.hours} />
+                  </ErrorBoundary>
                 )}
 
                 {historicalData && (
-                  <HistoricalComparison
-                    data={historicalData}
-                    todayHigh={forecastData?.forecast[0]?.high}
-                    unit={unit}
-                  />
+                  <ErrorBoundary>
+                    <HistoricalComparison
+                      data={historicalData}
+                      todayHigh={forecastData?.forecast[0]?.high}
+                      unit={unit}
+                    />
+                  </ErrorBoundary>
                 )}
 
                 {showAccuracy && accuracyData && (
-                  <AccuracyLeaderboard accuracy={accuracyData} />
+                  <ErrorBoundary>
+                    <AccuracyLeaderboard accuracy={accuracyData} />
+                  </ErrorBoundary>
                 )}
 
                 {weather.consensus.airQualityIndex != null && weather.consensus.airQualityCategory && (
-                  <AirQuality
-                    aqi={weather.consensus.airQualityIndex}
-                    category={weather.consensus.airQualityCategory}
-                  />
+                  <ErrorBoundary>
+                    <AirQuality
+                      aqi={weather.consensus.airQualityIndex}
+                      category={weather.consensus.airQualityCategory}
+                    />
+                  </ErrorBoundary>
                 )}
               </div>
             </div>
@@ -480,11 +540,15 @@ export default function App() {
         Ask AI
       </button>
 
-      <AIChatDrawer
-        city={city}
-        isOpen={chatOpen}
-        onClose={() => setChatOpen(false)}
-      />
+      <ErrorBoundary>
+        <AIChatDrawer
+          city={city}
+          isOpen={chatOpen}
+          onClose={() => setChatOpen(false)}
+        />
+      </ErrorBoundary>
+      </>} />
+      </Routes>
     </>
   );
 }

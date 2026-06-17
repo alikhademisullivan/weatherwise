@@ -5,6 +5,7 @@ interface Message {
   role: 'user' | 'ai';
   text: string;
   question?: string;
+  isRateLimited?: boolean;
 }
 
 interface Props {
@@ -51,8 +52,15 @@ export default function AIChatDrawer({ city, isOpen, onClose }: Props) {
         body: JSON.stringify({ city, question, history }),
       });
       const data = await res.json();
-      const text = res.ok ? data.answer : (data.error ?? 'Something went wrong.');
-      setMessages(prev => [...prev, { role: 'ai', text, question }]);
+      if (res.status === 429 && data.error === 'rate_limited') {
+        setMessages(prev => [
+          ...prev,
+          { role: 'ai', text: data.message ?? "AI is taking a breather — try again in a minute.", isRateLimited: true },
+        ]);
+      } else {
+        const text = res.ok ? data.answer : (data.error ?? 'Something went wrong.');
+        setMessages(prev => [...prev, { role: 'ai', text, question }]);
+      }
     } catch {
       setMessages(prev => [
         ...prev,
@@ -90,8 +98,11 @@ export default function AIChatDrawer({ city, isOpen, onClose }: Props) {
             <div className={`rounded-2xl px-4 py-2 max-w-[85%] text-sm ${
               msg.role === 'user'
                 ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-800'
+                : msg.isRateLimited
+                  ? 'bg-amber-50 border border-amber-300 text-amber-800'
+                  : 'bg-gray-100 text-gray-800'
             }`}>
+              {msg.isRateLimited && <span className="mr-1">⚡</span>}
               {msg.text}
             </div>
             {msg.role === 'ai' && (

@@ -3,9 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WeatherWise — Trust Your Forecast</title>
-    <meta name="description" content="The weather app that tells you when to trust the forecast." />
+    <meta name="description" content="WeatherWise pulls forecasts from 4 sources and shows you when they disagree — so you know exactly how much to trust today's forecast." />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://weatherwise.app" />
+    <meta property="og:title" content="WeatherWise — The weather app that tells you when to trust the forecast" />
+    <meta property="og:description" content="Pulls from 4 weather sources, computes a consensus, and flags when they disagree. Free, no ads, no paywall." />
+    <meta property="og:image" content="https://weatherwise.app/og-image.svg" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="WeatherWise — The weather app that tells you when to trust the forecast" />
+    <meta name="twitter:description" content="Pulls from 4 weather sources, computes a consensus, and flags when they disagree. Free, no ads, no paywall." />
+    <meta name="twitter:image" content="https://weatherwise.app/og-image.svg" />
 
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json" />
@@ -14,7 +30,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="WeatherWise" />
-    <link rel="apple-touch-icon" href="/favicon.svg" />
   </head>
   <body>
     <div id="root"></div>
