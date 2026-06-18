@@ -238,13 +238,19 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            {/* °C / °F toggle */}
-            <div className="flex gap-0.5 bg-white/10 rounded-lg p-0.5">
+            {/* °C / °F toggle — single tap-to-cycle on mobile, dual buttons on desktop */}
+            <button
+              onClick={() => changeUnit(unit === 'C' ? 'F' : 'C')}
+              className="sm:hidden px-2 py-1 rounded-lg bg-white/20 text-white text-xs font-medium transition-colors"
+            >
+              °{unit}
+            </button>
+            <div className="hidden sm:flex gap-0.5 bg-white/10 rounded-lg p-0.5">
               {(['C', 'F'] as const).map(u => (
                 <button
                   key={u}
                   onClick={() => changeUnit(u)}
-                  className={`px-2 sm:px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                     unit === u ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'
                   }`}
                 >
@@ -253,11 +259,11 @@ export default function App() {
               ))}
             </div>
 
-            {/* Theme toggle */}
+            {/* Theme toggle — hidden on mobile, shown in sub-toolbar instead */}
             <button
               onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="text-xs px-2 sm:px-2.5 py-1 rounded-lg bg-white/10 text-white/50 hover:text-white/80 hover:bg-white/15 transition-colors"
+              className="hidden sm:block text-xs px-2.5 py-1 rounded-lg bg-white/10 text-white/50 hover:text-white/80 hover:bg-white/15 transition-colors"
             >
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
@@ -359,6 +365,24 @@ export default function App() {
               }`}
             >
               {isSaved(city) ? '★ Saved' : '☆ Save'}
+            </button>
+
+            <button
+              type="button"
+              onClick={locate}
+              disabled={locating}
+              title="Use my location"
+              className="text-xs px-2 py-1 rounded-lg bg-white/10 text-white/50 hover:text-white/80 transition-colors"
+            >
+              {locating ? '⟳' : '📍'}
+            </button>
+
+            <button
+              onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="text-xs px-2 py-1 rounded-lg bg-white/10 text-white/50 hover:text-white/80 transition-colors"
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
             </button>
 
             <div className="ml-auto">
