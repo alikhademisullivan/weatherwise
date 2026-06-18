@@ -25,6 +25,9 @@ import WeekendPlanner from './components/WeekendPlanner';
 import CommuteMode from './components/CommuteMode';
 import CustomAlerts from './components/CustomAlerts';
 import DigestSubscribe from './components/DigestSubscribe';
+import SleepQualityCard from './components/SleepQualityCard';
+import PressureHealth from './components/PressureHealth';
+import EnergyWarning from './components/EnergyWarning';
 import ErrorBoundary from './components/ErrorBoundary';
 import OfflineBanner from './components/OfflineBanner';
 import AboutPage from './components/AboutPage';
@@ -124,6 +127,14 @@ export default function App() {
       localStorage.setItem('ww_last_updated', new Date().toISOString());
     }
   }, [weather, city]);
+
+  // When the server resolves an ambiguous city (e.g. "London" → "London, England, United Kingdom"),
+  // update the search bar so the user knows which city's data they're seeing.
+  useEffect(() => {
+    if (weather?.resolvedCity && weather.resolvedCity !== searchValue) {
+      setSearchValue(weather.resolvedCity);
+    }
+  }, [weather?.resolvedCity]);
 
   // Press '/' anywhere to focus the search bar
   useEffect(() => {
@@ -294,6 +305,16 @@ export default function App() {
               <AlertsBanner alerts={alertsData.alerts} />
             )}
 
+            {forecastData && (
+              <ErrorBoundary>
+                <EnergyWarning
+                  forecast={forecastData.forecast}
+                  historical={historicalData}
+                  unit={unit}
+                />
+              </ErrorBoundary>
+            )}
+
             <SmartSummary
               consensus={weather.consensus}
               forecast={forecastData?.forecast}
@@ -320,7 +341,7 @@ export default function App() {
                     <div className="text-white/70 text-base mt-1 truncate">{weather.consensus.condition}</div>
                     <div className="text-white/50 text-sm mt-1.5 flex items-center gap-1 flex-wrap">
                       <span>📍</span>
-                      <span className="truncate">{weather.location}</span>
+                      <span className="truncate">{weather.resolvedCity ?? weather.location}</span>
                       <span className="text-white/25">·</span>
                       <span className="text-white/35 text-xs shrink-0">
                         {weather.sources.length} source{weather.sources.length > 1 ? 's' : ''}
@@ -462,6 +483,22 @@ export default function App() {
                     />
                   </ErrorBoundary>
                 )}
+
+                {hourlyData && hourlyData.hours.length > 0 && (
+                  <ErrorBoundary>
+                    <SleepQualityCard
+                      consensus={weather.consensus}
+                      hourly={hourlyData.hours}
+                      unit={unit}
+                    />
+                  </ErrorBoundary>
+                )}
+
+                {hourlyData && hourlyData.hours.length > 0 && (
+                  <ErrorBoundary>
+                    <PressureHealth hourly={hourlyData.hours} />
+                  </ErrorBoundary>
+                )}
               </div>
             </div>
 
@@ -489,7 +526,7 @@ export default function App() {
 
                   <NotificationOptIn consensus={weather.consensus} city={city} />
 
-                  <CustomAlerts consensus={weather.consensus} city={city} />
+                  <CustomAlerts consensus={weather.consensus} city={city} forecast={forecastData?.forecast} />
 
                   <LocationFeedback city={city} coords={coords} summary={feedbackSummary} />
 

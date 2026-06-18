@@ -128,15 +128,17 @@ router.get('/current', async (req: Request, res: Response) => {
   if (cached) return res.json({ ...cached, cached: true });
 
   try {
-    const [readings, dynamicWeights] = await Promise.all([
+    const [readings, dynamicWeights, resolvedCity] = await Promise.all([
       fetchAllCurrentSources(city, coords),
       getDynamicWeights(city),
+      coords ? Promise.resolve(null) : openMeteo.resolveCity(city),
     ]);
     if (!readings.length) return res.status(502).json({ error: 'All weather sources failed' });
 
     const consensus = buildConsensus(readings, city, dynamicWeights);
     const response: WeatherResponse = {
       location: city,
+      ...(resolvedCity ? { resolvedCity } : {}),
       consensus,
       sources: readings,
       updatedAt: new Date().toISOString(),
@@ -373,12 +375,23 @@ router.get('/historical', async (req: Request, res: Response) => {
     if (lat !== undefined && lon !== undefined) {
       geoLat = lat; geoLon = lon;
     } else {
+      const geoParts = city.split(',').map((s: string) => s.trim());
+      const geoBase = geoParts[0];
+      const geoHints = geoParts.slice(1).map((s: string) => s.toLowerCase());
       const { data } = await axios.get('https://geocoding-api.open-meteo.com/v1/search', {
-        params: { name: city, count: 1, language: 'en', format: 'json' },
+        params: { name: geoBase, count: 5, language: 'en', format: 'json' },
       });
       if (!data.results?.length) return res.status(404).json({ error: 'City not found' });
-      geoLat = data.results[0].latitude;
-      geoLon = data.results[0].longitude;
+      const bestResult = geoHints.length > 0
+        ? (data.results.find((r: any) =>
+            geoHints.some((h: string) =>
+              r.country?.toLowerCase().includes(h) ||
+              r.admin1?.toLowerCase().includes(h)
+            )
+          ) ?? data.results[0])
+        : data.results[0];
+      geoLat = bestResult.latitude;
+      geoLon = bestResult.longitude;
     }
 
     const yesterday = new Date();

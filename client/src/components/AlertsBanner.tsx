@@ -59,19 +59,26 @@ function AlertCard({ alert, onDismiss }: { alert: WeatherAlert; onDismiss: () =>
   );
 }
 
+function alertKey(alert: WeatherAlert, index: number): string {
+  return `${index}::${alert.event}::${alert.effective ?? ''}`;
+}
+
 export default function AlertsBanner({ alerts }: Props) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
-  const visible = alerts.filter(a => !dismissed.has(a.headline + a.event));
+  const visible = alerts
+    .map((a, i) => ({ alert: a, key: alertKey(a, i) }))
+    .filter(({ key }) => !dismissed.has(key));
+
   if (!visible.length) return null;
 
   return (
     <div className="space-y-2">
-      {visible.map(alert => (
+      {visible.map(({ alert, key }) => (
         <AlertCard
-          key={alert.headline + alert.event}
+          key={key}
           alert={alert}
-          onDismiss={() => setDismissed(prev => new Set(prev).add(alert.headline + alert.event))}
+          onDismiss={() => setDismissed(prev => new Set(prev).add(key))}
         />
       ))}
     </div>
