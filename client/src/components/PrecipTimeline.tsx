@@ -3,7 +3,7 @@ import {
   ComposedChart, Area, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import type { PrecipTimelineResponse, SourceReading } from '../types/weather';
+import type { PrecipTimelineResponse, SourceReading, WeatherAlert } from '../types/weather';
 import type { HourlyReading } from '../types/weather';
 
 type Range = '1h' | '3h' | '6h' | '12h' | '24h' | '48h';
@@ -16,10 +16,23 @@ interface DataPoint {
   intensity: number;  // mm/hr intensity (Tomorrow.io only)
 }
 
+const STORM_KEYWORDS = /thunderstorm|tornado|squall|cyclone|hurricane|severe|storm|wind|flood|hail/i;
+
+function getActiveStormAlerts(alerts: WeatherAlert[] | undefined): WeatherAlert[] {
+  if (!alerts?.length) return [];
+  const now = Date.now();
+  return alerts.filter(a => {
+    const expired = a.expires && new Date(a.expires).getTime() < now;
+    if (expired) return false;
+    return a.severity === 'Severe' || a.severity === 'Extreme' || a.severity === 'Moderate' || STORM_KEYWORDS.test(a.event);
+  });
+}
+
 interface Props {
   data: PrecipTimelineResponse;
   hours?: HourlyReading[];
   sources?: SourceReading[];
+  alerts?: WeatherAlert[];
 }
 
 function isMinuteLevel(minutes: { time: string }[]): boolean {
@@ -98,7 +111,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   );
 };
 
-export default function PrecipTimeline({ data, hours, sources }: Props) {
+export default function PrecipTimeline({ data, hours, sources, alerts }: Props) {
   const minuteLevel = isMinuteLevel(data.minutes);
 
   const rawMinutes: DataPoint[] = useMemo(() => data.minutes.map(m => ({
@@ -143,6 +156,8 @@ export default function PrecipTimeline({ data, hours, sources }: Props) {
     return rawMinutes.filter(m => new Date(m.time) <= cutoff);
   }, [activeRange, rangeHours, rawMinutes, hours, minuteLevel]);
 
+  const activeStormAlerts = useMemo(() => getActiveStormAlerts(alerts), [alerts]);
+
   if (!chartData.length) return null;
 
   const peakProb = Math.max(...chartData.map(d => d.prob));
@@ -158,16 +173,22 @@ export default function PrecipTimeline({ data, hours, sources }: Props) {
   const rainyLabel = minuteLevel && activeRange === '1h' ? `${rainyCount} min` : `${rainyCount}h`;
 
   // Which source is actually powering the chart for the active range
+  const minuteSource = minuteLevel ? data.source : null;
   const chartSource = (activeRange === '1h' && minuteLevel) ? data.source : (hours ? 'Open-Meteo' : data.source);
+  // True when switching ranges forces a source change (e.g. 1h=Tomorrow.io → 3h=Open-Meteo)
+  const sourceChangedForRange = !!(minuteSource && chartSource !== minuteSource);
 
-  // Source divergence: compare chart source vs. other sources for CURRENT conditions
+  // Source divergence: compare the MAX vs MIN precipitation probability across all sources.
+  // NOTE: these are current-conditions snapshots from each provider's SourceReading,
+  // not the timeline forecast itself. The 💧 values in the source breakdown are humidity.
   const sourcePrecipReadings = sources?.map(s => ({ name: s.source, prob: s.precipitationProbability })) ?? [];
-  const chartSourceReading = sourcePrecipReadings.find(s => s.name === chartSource);
-  const otherSources = sourcePrecipReadings.filter(s => s.name !== chartSource);
-  const highestOther = [...otherSources].sort((a, b) => b.prob - a.prob)[0];
+  const sortedByProb = [...sourcePrecipReadings].sort((a, b) => b.prob - a.prob);
+  const highestPrecipSource = sortedByProb[0];
+  const lowestPrecipSource = sortedByProb[sortedByProb.length - 1];
   const hasSourceDivergence = !!(
-    chartSourceReading && highestOther &&
-    Math.abs(highestOther.prob - chartSourceReading.prob) >= 25
+    highestPrecipSource && lowestPrecipSource &&
+    highestPrecipSource.name !== lowestPrecipSource.name &&
+    highestPrecipSource.prob - lowestPrecipSource.prob >= 25
   );
 
   const tickFormatter = (t: string) => {
@@ -225,16 +246,53 @@ export default function PrecipTimeline({ data, hours, sources }: Props) {
         </div>
       </div>
 
-      {/* Source divergence warning */}
-      {hasSourceDivergence && highestOther && chartSourceReading && (
+      {/* Source switch notice — shown when changing ranges silently changes the data source */}
+      {sourceChangedForRange && (
+        <div className="mb-3 flex items-start gap-2 rounded-xl bg-white/5 border border-white/10 px-3 py-2">
+          <span className="text-white/40 text-sm shrink-0">ℹ</span>
+          <p className="text-white/50 text-xs leading-relaxed">
+            Ranges beyond 1h switch to <span className="text-white/70 font-medium">{chartSource}</span> hourly
+            data — the 1h view uses <span className="text-white/70 font-medium">{minuteSource}</span> minute-level
+            data and may disagree.
+          </p>
+        </div>
+      )}
+
+      {/* Source divergence warning — compares current-conditions precipitation probability across all sources */}
+      {hasSourceDivergence && highestPrecipSource && lowestPrecipSource && (
         <div className="mb-3 flex items-start gap-2 rounded-xl bg-amber-400/8 border border-amber-400/20 px-3 py-2">
           <span className="text-amber-400 text-sm shrink-0">⚠</span>
           <p className="text-amber-300/80 text-xs leading-relaxed">
-            <span className="font-semibold text-amber-300">{highestOther.name}</span> reports{' '}
-            <span className="font-semibold text-amber-300">{highestOther.prob}%</span> vs{' '}
-            {chartSource}&apos;s <span className="font-semibold">{chartSourceReading.prob}%</span> shown here —
-            forecasts vary by model.
+            Sources disagree on current rain probability —{' '}
+            <span className="font-semibold text-amber-300">{highestPrecipSource.name}</span> shows{' '}
+            <span className="font-semibold text-amber-300">{highestPrecipSource.prob}%</span> while{' '}
+            <span className="font-semibold text-amber-300">{lowestPrecipSource.name}</span> shows{' '}
+            <span className="font-semibold text-amber-300">{lowestPrecipSource.prob}%</span>.
           </p>
+        </div>
+      )}
+
+      {/* Official alert notice — shown when active warnings contradict the forecast chart */}
+      {activeStormAlerts.length > 0 && (
+        <div className="mb-3 flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-400/25 px-3 py-2.5">
+          <span className="text-red-400 text-base shrink-0 mt-0.5">⚠️</span>
+          <div className="min-w-0">
+            <p className="text-red-300 text-xs font-semibold leading-snug">
+              Official weather alerts are active — conditions may be more severe than shown below
+            </p>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {activeStormAlerts.map((a, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-500/15 border border-red-400/20 text-red-300/80"
+                >
+                  <span className="font-medium capitalize">{a.severity}</span>
+                  <span className="text-red-400/50">·</span>
+                  <span>{a.event}</span>
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

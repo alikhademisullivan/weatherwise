@@ -156,7 +156,7 @@ export default function App() {
 
   useEffect(() => {
     if (weather && city) {
-      localStorage.setItem('ww_last_city', weather.location ?? city);
+      localStorage.setItem('ww_last_city', weather.resolvedCity ?? weather.location ?? city);
       localStorage.setItem('ww_last_updated', new Date().toISOString());
     }
   }, [weather, city]);
@@ -562,7 +562,7 @@ export default function App() {
                 {precipTimeline && precipTimeline.minutes.length > 0 && (
                   <ErrorBoundary>
                     <div style={fadeStyle(4)} className={fadeClass(4)}>
-                      <PrecipTimeline data={precipTimeline} hours={extendedHourly?.hours} sources={weather.sources} />
+                      <PrecipTimeline data={precipTimeline} hours={extendedHourly?.hours} sources={weather.sources} alerts={alertsData?.alerts} />
                     </div>
                   </ErrorBoundary>
                 )}

@@ -67,8 +67,11 @@ export default function SearchBar({ value, onValueChange, onSearch, onLocate, lo
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const trimmed = value.trim();
-    if (trimmed) {
-      setOpen(false);
+    if (!trimmed) return;
+    setOpen(false);
+    if (suggestions.length > 0) {
+      handleSelect(suggestions[0]);
+    } else {
       onSearch(trimmed);
     }
   }
@@ -109,7 +112,7 @@ export default function SearchBar({ value, onValueChange, onSearch, onLocate, lo
             <li key={i}>
               <button
                 type="button"
-                onMouseDown={() => handleSelect(s)}
+                onMouseDown={e => { e.preventDefault(); handleSelect(s); }}
                 className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 transition-colors"
               >
                 {s.label}

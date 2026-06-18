@@ -29,6 +29,15 @@ CREATE TABLE IF NOT EXISTS predictions (
 CREATE INDEX IF NOT EXISTS idx_predictions_location_date
   ON predictions (location, for_date);
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'predictions_source_location_date_uq'
+  ) THEN
+    ALTER TABLE predictions ADD CONSTRAINT predictions_source_location_date_uq UNIQUE (source, location, for_date);
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS actuals (
   id          SERIAL PRIMARY KEY,
   location    VARCHAR(200)   NOT NULL,

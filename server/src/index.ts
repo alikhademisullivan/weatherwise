@@ -9,7 +9,7 @@ import weatherRouter from './routes/weather';
 import askRouter from './routes/ask';
 import authRouter from './routes/auth';
 import { runMigrations } from './db/migrations';
-import { scheduleAccuracyCron } from './jobs/accuracyCron';
+import { scheduleAccuracyCron, runAccuracyJob } from './jobs/accuracyCron';
 import { scheduleDigestCron } from './jobs/digestCron';
 
 const app = express();
@@ -60,6 +60,9 @@ async function start() {
   await runMigrations();
   scheduleAccuracyCron();
   scheduleDigestCron();
+
+  // Backfill accuracy on every startup so data appears without waiting for the 2:15am cron
+  runAccuracyJob().catch(err => console.error('[AccuracyJob] Startup run failed:', err));
 
   app.listen(PORT, () => {
     console.log(`WeatherWise server running on http://localhost:${PORT}`);

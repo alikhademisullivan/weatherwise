@@ -4,6 +4,7 @@ import * as openMeteo from '../services/openMeteo';
 import * as openWeatherMap from '../services/openWeatherMap';
 import * as tomorrowIo from '../services/tomorrowIo';
 import * as weatherApi from '../services/weatherApi';
+import * as pirateWeather from '../services/pirateWeather';
 import { buildConsensus, mergeForecastDays } from '../services/consensus';
 import { getCached, setCached, buildCacheKey } from '../cache/weatherCache';
 import { getDynamicWeights, getAccuracyScores } from '../db/accuracy';
@@ -26,9 +27,10 @@ async function fetchAllCurrentSources(city: string, coords?: { lat: number; lon:
   const named: Array<{ name: string; task: Promise<SourceReading> }> = [
     { name: 'Open-Meteo',      task: openMeteo.getCurrentWeather(city, coords) },
   ];
-  if (process.env.OPENWEATHERMAP_API_KEY) named.push({ name: 'OpenWeatherMap', task: openWeatherMap.getCurrentWeather(city, coords) });
-  if (process.env.TOMORROW_IO_API_KEY)    named.push({ name: 'Tomorrow.io',    task: tomorrowIo.getCurrentWeather(city, coords) });
-  if (process.env.WEATHERAPI_KEY)         named.push({ name: 'WeatherAPI',      task: weatherApi.getCurrentWeather(city, coords) });
+  if (process.env.OPENWEATHERMAP_API_KEY)  named.push({ name: 'OpenWeatherMap',  task: openWeatherMap.getCurrentWeather(city, coords) });
+  if (process.env.TOMORROW_IO_API_KEY)     named.push({ name: 'Tomorrow.io',     task: tomorrowIo.getCurrentWeather(city, coords) });
+  if (process.env.WEATHERAPI_KEY)          named.push({ name: 'WeatherAPI',       task: weatherApi.getCurrentWeather(city, coords) });
+  if (process.env.PIRATE_WEATHER_API_KEY)  named.push({ name: 'Pirate Weather',   task: pirateWeather.getCurrentWeather(city, coords) });
 
   const results = await Promise.allSettled(named.map(n => n.task));
   const readings: SourceReading[] = [];
@@ -40,40 +42,40 @@ async function fetchAllCurrentSources(city: string, coords?: { lat: number; lon:
   return readings;
 }
 
-async function fetchAllForecastSources(city: string, days: number, coords?: { lat: number; lon: number }): Promise<ForecastDay[][]> {
+type NamedForecast = { name: string; days: ForecastDay[] };
+
+async function fetchAllForecastSources(city: string, days: number, coords?: { lat: number; lon: number }): Promise<NamedForecast[]> {
   const named: Array<{ name: string; task: Promise<ForecastDay[]> }> = [
     { name: 'Open-Meteo',      task: openMeteo.getForecast(city, days, coords) },
   ];
-  if (process.env.OPENWEATHERMAP_API_KEY) named.push({ name: 'OpenWeatherMap', task: openWeatherMap.getForecast(city, days, coords) });
-  if (process.env.TOMORROW_IO_API_KEY)    named.push({ name: 'Tomorrow.io',    task: tomorrowIo.getForecast(city, days, coords) });
-  if (process.env.WEATHERAPI_KEY)         named.push({ name: 'WeatherAPI',      task: weatherApi.getForecast(city, days, coords) });
+  if (process.env.OPENWEATHERMAP_API_KEY)  named.push({ name: 'OpenWeatherMap',  task: openWeatherMap.getForecast(city, days, coords) });
+  if (process.env.TOMORROW_IO_API_KEY)     named.push({ name: 'Tomorrow.io',     task: tomorrowIo.getForecast(city, days, coords) });
+  if (process.env.WEATHERAPI_KEY)          named.push({ name: 'WeatherAPI',       task: weatherApi.getForecast(city, days, coords) });
+  if (process.env.PIRATE_WEATHER_API_KEY)  named.push({ name: 'Pirate Weather',   task: pirateWeather.getForecast(city, days, coords) });
 
   const results = await Promise.allSettled(named.map(n => n.task));
-  const forecasts: ForecastDay[][] = [];
+  const forecasts: NamedForecast[] = [];
   for (let i = 0; i < results.length; i++) {
     const r = results[i];
-    if (r.status === 'fulfilled') forecasts.push(r.value);
+    if (r.status === 'fulfilled') forecasts.push({ name: named[i].name, days: r.value });
     else console.warn(`[forecast] ${named[i].name} fetch failed:`, r.reason?.response?.status ?? r.reason?.message);
   }
   return forecasts;
 }
 
 // Fire-and-forget: record each source's day+1 prediction into the DB
-async function recordForecastPredictions(city: string, perSourceForecasts: ForecastDay[][]): Promise<void> {
+async function recordForecastPredictions(city: string, perSourceForecasts: NamedForecast[]): Promise<void> {
   if (!dbEnabled()) return;
   try {
     // Resolve lat/lon once for this city
     const locations = await getUniqueLocations();
     const existing = locations.find(l => l.location === city.toLowerCase());
 
-    // We need lat/lon — use Open-Meteo geocoding. Reuse cached if available.
     let lat: number, lon: number;
     if (existing) {
-      lat = existing.latitude;
-      lon = existing.longitude;
+      lat = Number(existing.latitude);
+      lon = Number(existing.longitude);
     } else {
-      // Geocode via Open-Meteo (already done during the forecast fetch, but no shared cache here)
-      // Use a lightweight approach: re-geocode and cache the result in DB via first prediction row
       const { data } = await axios.get('https://geocoding-api.open-meteo.com/v1/search', {
         params: { name: city, count: 1, language: 'en', format: 'json' },
       });
@@ -87,19 +89,12 @@ async function recordForecastPredictions(city: string, perSourceForecasts: Forec
     tomorrow.setDate(tomorrow.getDate() + 1);
     const forDate = tomorrow.toISOString().split('T')[0];
 
-    // Build source name list — same order as fetchAllForecastSources
-    const sourceNames: string[] = ['Open-Meteo'];
-    if (process.env.OPENWEATHERMAP_API_KEY) sourceNames.push('OpenWeatherMap');
-    if (process.env.TOMORROW_IO_API_KEY)    sourceNames.push('Tomorrow.io');
-    if (process.env.WEATHERAPI_KEY)         sourceNames.push('WeatherAPI');
-
-    for (let i = 0; i < perSourceForecasts.length; i++) {
-      const days = perSourceForecasts[i];
+    for (const { name, days } of perSourceForecasts) {
       const dayOne = days.find(d => d.date === forDate) ?? days[0];
       if (!dayOne) continue;
 
       await recordPrediction(
-        sourceNames[i],
+        name,
         city,
         lat,
         lon,
@@ -173,7 +168,7 @@ router.get('/forecast', async (req: Request, res: Response) => {
     // Record predictions for accuracy tracking (non-blocking)
     recordForecastPredictions(city, perSource);
 
-    const forecast = mergeForecastDays(perSource).slice(0, days);
+    const forecast = mergeForecastDays(perSource.map(s => s.days)).slice(0, days);
     const response: ForecastResponse = {
       location: city,
       forecast,
@@ -313,7 +308,7 @@ router.get('/precipitation-timeline', async (req: Request, res: Response) => {
   const cached = getCached<any>(cacheKey);
   if (cached) return res.json({ ...cached, cached: true });
 
-  // Try Tomorrow.io minute-by-minute first; fall back to Open-Meteo hourly on rate-limit
+  // Try minutely sources in priority order; fall back to Open-Meteo hourly if both fail
   if (process.env.TOMORROW_IO_API_KEY) {
     try {
       const minutes = await tomorrowIo.getPrecipTimeline(city, coords);
@@ -322,12 +317,21 @@ router.get('/precipitation-timeline', async (req: Request, res: Response) => {
       return res.json(response);
     } catch (err: any) {
       if (err?.message === 'TOMORROW_RATE_LIMITED') {
-        // Fall through to Open-Meteo hourly fallback below
-        console.warn('[precip-timeline] Tomorrow.io rate limited — using Open-Meteo fallback');
+        console.warn('[precip-timeline] Tomorrow.io rate limited — trying Pirate Weather');
       } else {
         console.warn('[precip-timeline] Tomorrow.io failed:', err?.message);
-        // Also fall through to Open-Meteo
       }
+    }
+  }
+
+  if (process.env.PIRATE_WEATHER_API_KEY) {
+    try {
+      const minutes = await pirateWeather.getPrecipTimeline(city, coords);
+      const response = { city, minutes, source: 'Pirate Weather', updatedAt: new Date().toISOString() };
+      setCached(cacheKey, response);
+      return res.json(response);
+    } catch (err: any) {
+      console.warn('[precip-timeline] Pirate Weather failed:', err?.message);
     }
   }
 

@@ -31,7 +31,11 @@ export async function recordPrediction(
 ): Promise<void> {
   await query(
     `INSERT INTO predictions (source, location, latitude, longitude, for_date, temp_high, temp_low, condition)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (source, location, for_date) DO UPDATE
+       SET temp_high = EXCLUDED.temp_high,
+           temp_low  = EXCLUDED.temp_low,
+           condition = EXCLUDED.condition`,
     [source, location.toLowerCase(), latitude, longitude, forDate, tempHigh, tempLow, condition],
   );
 }
