@@ -23,16 +23,32 @@ interface GeoResult {
   longitude: number;
   name: string;
   country_code: string;
+  country?: string;
+  admin1?: string;
 }
 
 async function geocode(city: string): Promise<GeoResult> {
-  // Open-Meteo geocoding only understands plain city names, not "City, Region, Country" labels
-  const name = city.split(',')[0].trim();
+  // For "London, Ontario, Canada", search by just "London" with count:5,
+  // then pick the result whose country/admin matches the extra parts.
+  const parts = city.split(',').map(s => s.trim());
+  const baseName = parts[0];
+  const hints = parts.slice(1).map(s => s.toLowerCase());
+
   const { data } = await axios.get('https://geocoding-api.open-meteo.com/v1/search', {
-    params: { name, count: 1, language: 'en', format: 'json' },
+    params: { name: baseName, count: 5, language: 'en', format: 'json' },
   });
   if (!data.results?.length) throw new Error(`City not found: ${city}`);
-  return data.results[0];
+
+  const best: GeoResult = hints.length > 0
+    ? (data.results.find((r: GeoResult) =>
+        hints.some(h =>
+          r.country?.toLowerCase().includes(h) ||
+          (r as any).admin1?.toLowerCase().includes(h)
+        )
+      ) ?? data.results[0])
+    : data.results[0];
+
+  return best;
 }
 
 function wmoCodeToCondition(code: number): { condition: string; conditionCode: string } {
@@ -176,6 +192,7 @@ export async function getHourlyForecast(city: string, coords?: { lat: number; lo
         'precipitation',
         'wind_speed_10m',
         'weather_code',
+        'pressure_msl',
       ].join(','),
       forecast_days: forecastDays,
       wind_speed_unit: 'kmh',
@@ -197,6 +214,7 @@ export async function getHourlyForecast(city: string, coords?: { lat: number; lo
         windSpeed: h.wind_speed_10m[i],
         condition,
         conditionCode,
+        pressure: h.pressure_msl?.[i] ?? undefined,
       } satisfies HourlyReading;
     })
     .filter((h: HourlyReading) => new Date(h.time) >= now);
@@ -248,6 +266,15 @@ export async function getYesterdaysActual(lat: number, lon: number): Promise<{ h
 
     const { condition } = wmoCodeToCondition(d.weather_code[idx]);
     return { high: d.temperature_2m_max[idx], low: d.temperature_2m_min[idx], condition };
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveCity(city: string): Promise<string | null> {
+  try {
+    const geo = await geocode(city);
+    return [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');
   } catch {
     return null;
   }

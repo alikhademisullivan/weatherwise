@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import type { ConsensusReading } from '../types/weather';
+import type { ConsensusReading, ForecastDay } from '../types/weather';
 
 interface AlertThresholds {
   windKmh: number | null;
   rainPct: number | null;
   tempLow: number | null;
   spreadC: number | null;
+  frostAlert: boolean;
 }
 
 const DEFAULT_THRESHOLDS: AlertThresholds = {
@@ -13,6 +14,7 @@ const DEFAULT_THRESHOLDS: AlertThresholds = {
   rainPct: null,
   tempLow: null,
   spreadC: null,
+  frostAlert: false,
 };
 
 const STORAGE_KEY = 'ww-alert-thresholds';
@@ -38,16 +40,17 @@ function fireNotification(title: string, body: string) {
 interface Props {
   consensus: ConsensusReading | undefined;
   city: string;
+  forecast?: ForecastDay[];
 }
 
-export default function CustomAlerts({ consensus, city }: Props) {
+export default function CustomAlerts({ consensus, city, forecast }: Props) {
   const [thresholds, setThresholds] = useState<AlertThresholds>(loadThresholds);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<AlertThresholds>(loadThresholds);
   const firedRef = useRef<Set<string>>(new Set());
   const permission = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
 
-  // Check thresholds whenever consensus updates
+  // Check thresholds whenever consensus or forecast updates
   useEffect(() => {
     if (!consensus || permission !== 'granted') return;
 
@@ -96,7 +99,32 @@ export default function CustomAlerts({ consensus, city }: Props) {
         );
       }
     }
-  }, [consensus, thresholds, city, permission]);
+
+    if (thresholds.frostAlert && forecast && forecast.length > 0 && consensus.dewPoint != null) {
+      const tonight = forecast[0];
+      const tomorrow = forecast[1];
+      const dateStr = tonight.date;
+      if (tonight.low <= 2 && consensus.dewPoint <= 2) {
+        const key = `frost-${city}-${dateStr}`;
+        if (!firedRef.current.has(key)) {
+          firedRef.current.add(key);
+          fireNotification(
+            `WeatherWise: Frost risk tonight in ${city}`,
+            `Low of ${Math.round(tonight.low)}°C near dew point — consider covering plants`
+          );
+        }
+      } else if (tomorrow && tomorrow.low <= 2) {
+        const key = `frost-tomorrow-${city}-${tomorrow.date}`;
+        if (!firedRef.current.has(key)) {
+          firedRef.current.add(key);
+          fireNotification(
+            `WeatherWise: Frost risk tomorrow night in ${city}`,
+            `Low of ${Math.round(tomorrow.low)}°C — cover plants before nightfall`
+          );
+        }
+      }
+    }
+  }, [consensus, forecast, thresholds, city, permission]);
 
   // Reset fired keys when city changes
   useEffect(() => {
@@ -116,7 +144,13 @@ export default function CustomAlerts({ consensus, city }: Props) {
     saveThresholds(cleared);
   }
 
-  const activeCount = Object.values(thresholds).filter(v => v !== null).length;
+  const activeCount = [
+    thresholds.windKmh !== null,
+    thresholds.rainPct !== null,
+    thresholds.tempLow !== null,
+    thresholds.spreadC !== null,
+    thresholds.frostAlert,
+  ].filter(Boolean).length;
 
   return (
     <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3">
@@ -186,6 +220,11 @@ export default function CustomAlerts({ consensus, city }: Props) {
               <span className="text-white/70 font-medium">{thresholds.spreadC}°C</span>
             </div>
           )}
+          {thresholds.frostAlert && (
+            <div className="text-xs bg-blue-400/10 rounded-lg px-3 py-2 col-span-2">
+              <span className="text-blue-300/70">❄️ Frost risk alerts on</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -219,6 +258,27 @@ export default function CustomAlerts({ consensus, city }: Props) {
             onChange={v => setDraft(d => ({ ...d, spreadC: v }))}
             hint="Alert when sources differ by this much"
           />
+          <div className="space-y-1">
+            <label className="text-xs text-white/50 font-medium">Frost risk alert</label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div
+                role="checkbox"
+                aria-checked={draft.frostAlert}
+                onClick={() => setDraft(d => ({ ...d, frostAlert: !d.frostAlert }))}
+                className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${
+                  draft.frostAlert ? 'bg-blue-500' : 'bg-white/15'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                    draft.frostAlert ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </div>
+              <span className="text-xs text-white/50">Notify if overnight low may freeze plants</span>
+            </label>
+            <p className="text-white/25 text-xs">Triggers when low ≤ 2°C and dew point is near freezing</p>
+          </div>
           <button
             onClick={saveAndClose}
             className="w-full text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg font-medium transition-colors"

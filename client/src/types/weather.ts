@@ -99,6 +99,7 @@ export interface FeedbackSummary {
 
 export interface WeatherResponse {
   location: string;
+  resolvedCity?: string;
   consensus: ConsensusReading;
   sources: SourceReading[];
   updatedAt: string;
@@ -120,6 +121,7 @@ export interface HourlyReading {
   windSpeed: number;
   condition: string;
   conditionCode: string;
+  pressure?: number;
 }
 
 export interface HourlyForecastResponse {
