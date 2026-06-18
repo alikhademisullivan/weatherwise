@@ -49,6 +49,34 @@ CREATE TABLE IF NOT EXISTS source_accuracy (
   updated_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   PRIMARY KEY (source, location)
 );
+
+CREATE TABLE IF NOT EXISTS user_feedback (
+  id          SERIAL PRIMARY KEY,
+  rating      SMALLINT       NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  category    VARCHAR(50)    NOT NULL,
+  comment     TEXT,
+  email       VARCHAR(255),
+  created_at  TIMESTAMPTZ    NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id            SERIAL PRIMARY KEY,
+  email         VARCHAR(255)   NOT NULL UNIQUE,
+  password_hash VARCHAR(255)   NOT NULL,
+  display_name  VARCHAR(100),
+  created_at    TIMESTAMPTZ    NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS saved_locations (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  label       VARCHAR(200)   NOT NULL,
+  city        VARCHAR(200)   NOT NULL,
+  lat         NUMERIC(9,6),
+  lon         NUMERIC(9,6),
+  created_at  TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, city)
+);
 `;
 
 export async function runMigrations(): Promise<void> {

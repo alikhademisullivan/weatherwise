@@ -1,7 +1,9 @@
 import type { HourlyReading } from '../types/weather';
+import { formatWind } from '../utils/formatters';
 
 interface Props {
   hours: HourlyReading[];
+  unit?: 'C' | 'F';
 }
 
 const RAIN_THRESHOLD = 40; // % precipitation probability considered "rainy"
@@ -108,7 +110,15 @@ const COND_EMOJI: Record<string, string> = {
   rain: '🌧️', snow: '❄️', thunderstorm: '⛈️', fog: '🌫️', drizzle: '🌦️',
 };
 
-export default function BestTimeWidget({ hours }: Props) {
+// Score label for G3.18
+function scoreLabel(s: number): string {
+  if (s >= 80) return 'Great';
+  if (s >= 65) return 'Good';
+  if (s >= 45) return 'Fair';
+  return 'Poor';
+}
+
+export default function BestTimeWidget({ hours, unit = 'C' }: Props) {
   // Only use daytime hours (6am–10pm) for best-window calculation
   const now = new Date();
   const relevant = hours.filter(h => {
@@ -168,7 +178,8 @@ export default function BestTimeWidget({ hours }: Props) {
         </div>
         <div className="text-right shrink-0">
           <p className={`text-lg font-bold ${scoreColor}`}>{Math.round(best.score)}</p>
-          <p className="text-white/30 text-xs">/ 100</p>
+          {/* G3.18: text label alongside numeric score */}
+          <p className={`text-xs font-medium ${scoreColor}`}>{scoreLabel(best.score)}</p>
         </div>
       </div>
 
@@ -176,7 +187,7 @@ export default function BestTimeWidget({ hours }: Props) {
       <div className="flex items-center gap-4 text-xs text-white/50 px-1">
         <span>🌡️ {bestHour.temperature.toFixed(0)}°C</span>
         <span>💧 {bestHour.precipitationProbability}% rain</span>
-        <span>💨 {bestHour.windSpeed.toFixed(0)} km/h</span>
+        <span>💨 {formatWind(bestHour.windSpeed, unit)}</span>
       </div>
 
       {/* Rain timing */}
@@ -212,7 +223,7 @@ export default function BestTimeWidget({ hours }: Props) {
         </div>
       </div>
 
-      <p className="text-white/20 text-xs px-1">Score = 40% rain chance · 35% temperature comfort · 25% wind</p>
+      <p className="text-white/50 text-xs px-1">Score = 40% rain chance · 35% temp comfort · 25% wind</p>
     </div>
   );
 }

@@ -1,11 +1,12 @@
 import type { SourceReading, ConsensusReading, SourceAccuracy } from '../types/weather';
-import { formatTemp, formatTime } from '../utils/formatters';
+import { formatTemp, formatTime, formatWind } from '../utils/formatters';
 
 interface Props {
   sources: SourceReading[];
   consensus: ConsensusReading;
   accuracy: SourceAccuracy[];
   unit: 'C' | 'F';
+  onViewScorecard?: () => void;
 }
 
 function outlierIndex(sources: SourceReading[], consensus: ConsensusReading): number {
@@ -18,7 +19,7 @@ function outlierIndex(sources: SourceReading[], consensus: ConsensusReading): nu
   return idx;
 }
 
-export default function SourceBreakdown({ sources, consensus, accuracy, unit }: Props) {
+export default function SourceBreakdown({ sources, consensus, accuracy, unit, onViewScorecard }: Props) {
   const outlier = outlierIndex(sources, consensus);
   const accuracyBySource = Object.fromEntries(accuracy.map(a => [a.source, a]));
 
@@ -66,12 +67,21 @@ export default function SourceBreakdown({ sources, consensus, accuracy, unit }: 
 
               <div className="hidden sm:flex flex-col items-end text-xs text-white/40 w-20 shrink-0">
                 <span>💧 {s.humidity}%</span>
-                <span>💨 {s.windSpeed.toFixed(0)} km/h</span>
+                <span>💨 {formatWind(s.windSpeed, unit)}</span>
               </div>
             </div>
           );
         })}
       </div>
+
+      {onViewScorecard && (
+        <button
+          onClick={onViewScorecard}
+          className="mt-3 w-full text-xs text-white/35 hover:text-white/60 py-1.5 transition-colors text-center"
+        >
+          View source accuracy scorecard →
+        </button>
+      )}
     </div>
   );
 }

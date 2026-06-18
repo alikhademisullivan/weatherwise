@@ -142,11 +142,32 @@ export default function SunArc({ sunriseTime, sunsetTime, moonPhase }: Props) {
 
         {/* Daylight duration */}
         {dl && (
-          <text x="200" y={P0.y + 28} fill="rgba(255,255,255,0.35)" fontSize="10" textAnchor="middle">
+          <text x="200" y={P0.y + 28} fill="rgba(255,255,255,0.5)" fontSize="10" textAnchor="middle">
             {dl}
           </text>
         )}
+
+        {/* Nighttime label when sun is below horizon */}
+        {!isDaytime && (
+          <text x="200" y={P1.y + 8} fill="rgba(255,255,255,0.25)" fontSize="10" textAnchor="middle">
+            night
+          </text>
+        )}
       </svg>
+
+      {/* Elapsed / remaining legend */}
+      {isDaytime && totalLength > 0 && (
+        <div className="flex items-center justify-center gap-4 mt-1 mb-0.5 text-[10px]">
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-4 h-0.5 bg-amber-400/80 rounded" />
+            <span className="text-white/40">elapsed</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-4 h-0.5 border-t border-dashed border-white/30" />
+            <span className="text-white/40">remaining</span>
+          </span>
+        </div>
+      )}
 
       {moonPhase && (
         <p className="text-center text-white/40 text-xs mt-0.5">🌙 {moonPhase}</p>

@@ -117,6 +117,7 @@ export interface HourlyReading {
   time: string;
   temperature: number;
   precipitationProbability: number;
+  precipitationMm: number;
   windSpeed: number;
   condition: string;
   conditionCode: string;

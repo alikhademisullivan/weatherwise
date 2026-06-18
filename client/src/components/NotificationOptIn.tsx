@@ -65,8 +65,19 @@ export default function NotificationOptIn({ consensus, city }: Props) {
     setPermission(result as PermissionState);
   }
 
-  // Don't render if unsupported, already granted, or dismissed
-  if (permission === 'unsupported' || permission === 'granted' || permission === 'denied' || dismissed) {
+  // G3.22: show active indicator when granted
+  if (permission === 'granted') {
+    return (
+      <div className="flex items-center gap-2 rounded-xl bg-emerald-500/8 border border-emerald-500/15 px-4 py-2">
+        <span className="text-emerald-400 text-sm shrink-0">🔔</span>
+        <p className="text-emerald-300/70 text-xs flex-1">
+          Notifications on · watching for rain alerts and forecast disputes in {city}
+        </p>
+      </div>
+    );
+  }
+
+  if (permission === 'unsupported' || permission === 'denied' || dismissed) {
     return null;
   }
 

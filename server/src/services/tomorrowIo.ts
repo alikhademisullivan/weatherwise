@@ -5,8 +5,9 @@ const BASE = 'https://api.tomorrow.io/v4/weather';
 
 // Tomorrow.io uses Open-Meteo geocoding since it doesn't have its own free geocode
 async function geocode(city: string): Promise<{ lat: number; lon: number; name: string }> {
+  const name = city.split(',')[0].trim();
   const { data } = await axios.get('https://geocoding-api.open-meteo.com/v1/search', {
-    params: { name: city, count: 1, language: 'en', format: 'json' },
+    params: { name, count: 1, language: 'en', format: 'json' },
   });
   if (!data.results?.length) throw new Error(`City not found: ${city}`);
   const r = data.results[0];

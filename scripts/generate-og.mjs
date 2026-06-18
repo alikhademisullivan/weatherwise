@@ -1,0 +1,61 @@
+import sharp from 'sharp';
+
+// SVG without emoji for cross-platform rendering
+const svg = `<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0c1628"/>
+      <stop offset="100%" style="stop-color:#0e2a4a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#38bdf8"/>
+      <stop offset="100%" style="stop-color:#818cf8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid lines -->
+  <line x1="0" y1="210" x2="1200" y2="210" stroke="white" stroke-opacity="0.04"/>
+  <line x1="0" y1="420" x2="1200" y2="420" stroke="white" stroke-opacity="0.04"/>
+  <line x1="400" y1="0" x2="400" y2="630" stroke="white" stroke-opacity="0.04"/>
+  <line x1="800" y1="0" x2="800" y2="630" stroke="white" stroke-opacity="0.04"/>
+
+  <!-- Glow circle -->
+  <circle cx="950" cy="315" r="250" fill="#38bdf8" fill-opacity="0.06"/>
+
+  <!-- Sun (replaces emoji for cross-platform rendering) -->
+  <circle cx="900" cy="280" r="80" fill="#fbbf24" fill-opacity="0.9"/>
+  <circle cx="900" cy="280" r="80" fill="none" stroke="#fbbf24" stroke-opacity="0.3" stroke-width="20"/>
+  <!-- Cloud body -->
+  <ellipse cx="930" cy="360" rx="110" ry="65" fill="white" fill-opacity="0.18"/>
+  <ellipse cx="870" cy="375" rx="80" ry="55" fill="white" fill-opacity="0.18"/>
+  <ellipse cx="1000" cy="370" rx="70" ry="50" fill="white" fill-opacity="0.15"/>
+
+  <!-- Brand -->
+  <text x="80" y="200" font-family="system-ui, -apple-system, sans-serif" font-size="68" font-weight="700" fill="white">WeatherWise</text>
+
+  <!-- Accent line -->
+  <rect x="80" y="220" width="160" height="4" rx="2" fill="url(#accent)"/>
+
+  <!-- Tagline -->
+  <text x="80" y="290" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="white" fill-opacity="0.6">The weather app that tells you</text>
+  <text x="80" y="330" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="white" fill-opacity="0.6">when to trust the forecast.</text>
+
+  <!-- Feature pills -->
+  <rect x="80" y="390" width="170" height="38" rx="19" fill="white" fill-opacity="0.08"/>
+  <text x="165" y="414" font-family="system-ui, sans-serif" font-size="16" fill="white" fill-opacity="0.7" text-anchor="middle">4 weather sources</text>
+
+  <rect x="264" y="390" width="160" height="38" rx="19" fill="white" fill-opacity="0.08"/>
+  <text x="344" y="414" font-family="system-ui, sans-serif" font-size="16" fill="white" fill-opacity="0.7" text-anchor="middle">AI consensus</text>
+
+  <rect x="438" y="390" width="120" height="38" rx="19" fill="white" fill-opacity="0.08"/>
+  <text x="498" y="414" font-family="system-ui, sans-serif" font-size="16" fill="white" fill-opacity="0.7" text-anchor="middle">Free forever</text>
+
+  <!-- Domain -->
+  <text x="80" y="540" font-family="system-ui, sans-serif" font-size="22" fill="white" fill-opacity="0.35">weather.alikhs.com</text>
+</svg>`;
+
+await sharp(Buffer.from(svg)).png().toFile('./client/public/og-image.png');
+console.log('OG image generated: client/public/og-image.png (1200x630)');

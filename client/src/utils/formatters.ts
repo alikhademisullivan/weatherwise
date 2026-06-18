@@ -2,6 +2,19 @@ export function celsiusToFahrenheit(c: number): number {
   return parseFloat(((c * 9) / 5 + 32).toFixed(1));
 }
 
+export function kphToMph(kph: number): number {
+  return kph * 0.621371;
+}
+
+export function formatWind(kph: number, unit: 'C' | 'F'): string {
+  if (unit === 'F') return `${Math.round(kphToMph(kph))} mph`;
+  return `${Math.round(kph)} km/h`;
+}
+
+export function windSpeedUnit(unit: 'C' | 'F'): string {
+  return unit === 'F' ? ' mph' : ' km/h';
+}
+
 export function formatTemp(celsius: number, unit: 'C' | 'F'): string {
   const val = unit === 'F' ? celsiusToFahrenheit(celsius) : celsius;
   return `${Math.round(val)}°${unit}`;

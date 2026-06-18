@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import type { ConsensusReading } from '../types/weather';
+import { formatWind } from '../utils/formatters';
 
 interface Props {
   consensus: ConsensusReading;
   city: string;
   unit: 'C' | 'F';
+  coords?: { lat: number; lon: number };
 }
 
 function convertTemp(c: number, unit: 'C' | 'F'): string {
@@ -12,40 +14,55 @@ function convertTemp(c: number, unit: 'C' | 'F'): string {
   return `${val}°${unit}`;
 }
 
-function buildShareText(consensus: ConsensusReading, city: string, unit: 'C' | 'F'): string {
+function buildShareUrl(city: string, coords?: { lat: number; lon: number }): string {
+  const base = window.location.origin + window.location.pathname;
+  const params = new URLSearchParams();
+  if (coords) {
+    params.set('lat', coords.lat.toFixed(4));
+    params.set('lon', coords.lon.toFixed(4));
+  } else if (city) {
+    params.set('city', city);
+  }
+  return `${base}?${params.toString()}`;
+}
+
+function buildShareText(consensus: ConsensusReading, city: string, unit: 'C' | 'F', coords?: { lat: number; lon: number }): string {
   const temp = convertTemp(consensus.temperature, unit);
   const sources = consensus.sources.length;
   const confidence = consensus.confidenceScore;
   const condition = consensus.condition.replace(/_/g, ' ');
+  const spreadDisplay = unit === 'F' ? (consensus.spread * 9 / 5).toFixed(1) : consensus.spread.toFixed(1);
+  const url = buildShareUrl(city, coords);
 
   const lines = [
     `📍 ${city} · ${temp} · ${condition}`,
     consensus.isDisputed
-      ? `⚠️ Sources split ${consensus.spread.toFixed(1)}° apart — low confidence (${confidence}/100)`
+      ? `⚠️ Sources split ${spreadDisplay}°${unit} apart — low confidence (${confidence}/100)`
       : `✅ ${sources} sources agree · ${confidence}/100 confidence`,
-    `💧 ${consensus.precipitationProbability}% rain  💨 ${Math.round(consensus.windSpeed)} km/h`,
-    `\nvia WeatherWise — the forecast that tells you when to trust the forecast`,
+    `💧 ${consensus.precipitationProbability}% rain  💨 ${formatWind(consensus.windSpeed, unit)}`,
+    `\n${url}`,
+    `via WeatherWise — the forecast that tells you when to trust the forecast`,
   ];
 
   return lines.join('\n');
 }
 
-export default function ShareCard({ consensus, city, unit }: Props) {
+export default function ShareCard({ consensus, city, unit, coords }: Props) {
   const [copied, setCopied] = useState(false);
 
   async function share() {
-    const text = buildShareText(consensus, city, unit);
+    const text = buildShareText(consensus, city, unit, coords);
+    const url = buildShareUrl(city, coords);
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: `WeatherWise · ${city}`, text });
+        await navigator.share({ title: `WeatherWise · ${city}`, text, url });
         return;
       } catch {
         // User cancelled or share failed — fall through to clipboard
       }
     }
 
-    // Clipboard fallback
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);

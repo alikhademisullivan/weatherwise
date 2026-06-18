@@ -47,9 +47,6 @@ export default function AccuracyLeaderboard({ accuracy }: Props) {
             WeatherWise stores every forecast and compares it to what actually happened.
             Check back in 24–48 hours — your local scorecard will appear here.
           </p>
-          <div className="mt-4 flex justify-center gap-6 text-white/20 text-xs">
-            <span>Requires DATABASE_URL</span>
-          </div>
         </div>
       </div>
     );
@@ -131,10 +128,17 @@ export default function AccuracyLeaderboard({ accuracy }: Props) {
         })}
       </div>
 
-      <p className="text-white/20 text-xs pt-1 border-t border-white/8 leading-relaxed">
-        Accuracy = daily high/low vs Open-Meteo historical actuals. Higher score → higher weight in your consensus temperature.
-        No other consumer weather app publishes this per city.
-      </p>
+      <div className="pt-1 border-t border-white/8 space-y-1">
+        <p className="text-white/40 text-xs leading-relaxed">
+          Accuracy = daily high/low vs Open-Meteo historical actuals. Higher score → higher weight in your consensus temperature.
+          No other consumer weather app publishes this per city.
+        </p>
+        {!accuracy.usingDynamicWeights && (
+          <p className="text-white/30 text-xs">
+            Weights frozen at ×1.00 — more data needed before dynamic weighting activates.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

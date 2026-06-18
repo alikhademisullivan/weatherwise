@@ -189,6 +189,7 @@ export async function getHourlyForecast(city: string, coords?: { lat: number; lo
       hourly: [
         'temperature_2m',
         'precipitation_probability',
+        'precipitation',
         'wind_speed_10m',
         'weather_code',
         'pressure_msl',
@@ -209,6 +210,7 @@ export async function getHourlyForecast(city: string, coords?: { lat: number; lo
         time,
         temperature: h.temperature_2m[i],
         precipitationProbability: h.precipitation_probability[i] ?? 0,
+        precipitationMm: h.precipitation[i] ?? 0,
         windSpeed: h.wind_speed_10m[i],
         condition,
         conditionCode,
