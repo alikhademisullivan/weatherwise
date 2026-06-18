@@ -45,9 +45,11 @@ export default function FeedbackWidget() {
       {/* Floating trigger button */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 left-3 sm:bottom-6 sm:left-6 bg-white/10 hover:bg-white/15 border border-white/15 text-white/70 hover:text-white rounded-full px-3 sm:px-4 py-2 sm:py-2.5 shadow-lg text-xs font-medium transition-colors z-40 backdrop-blur-sm"
+        className="fixed bottom-20 left-3 sm:bottom-6 sm:left-6 bg-white/10 hover:bg-white/15 border border-white/15 text-white/70 hover:text-white rounded-full shadow-lg transition-colors z-40 backdrop-blur-sm flex items-center justify-center h-9 w-9 sm:h-auto sm:w-auto sm:px-4 sm:py-2.5"
+        aria-label="Share feedback"
       >
-        Feedback
+        <span className="sm:hidden text-sm leading-none">★</span>
+        <span className="hidden sm:inline text-xs font-medium">Feedback</span>
       </button>
 
       {/* Modal overlay */}

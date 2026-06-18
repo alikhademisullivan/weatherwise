@@ -90,15 +90,16 @@ export default function SearchBar({ value, onValueChange, onSearch, onLocate, lo
           onClick={onLocate}
           disabled={locating}
           title="Use my location"
-          className="px-3 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl transition-colors disabled:opacity-50"
+          className="hidden sm:flex px-3 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl transition-colors disabled:opacity-50 items-center justify-center"
         >
           {locating ? <span className="animate-spin inline-block">⟳</span> : '📍'}
         </button>
         <button
           type="submit"
-          className="px-5 py-3 bg-blue-500 hover:bg-blue-400 text-white rounded-xl font-medium text-sm transition-colors"
+          className="px-3 sm:px-5 py-3 bg-blue-500 hover:bg-blue-400 text-white rounded-xl font-medium text-sm transition-colors"
         >
-          Search
+          <span className="sm:hidden">🔍</span>
+          <span className="hidden sm:inline">Search</span>
         </button>
       </form>
 
