@@ -38,7 +38,15 @@ export async function getCurrentWeather(city: string, coords?: { lat: number; lo
 
   const c = data.current;
   const astro = data.forecast?.forecastday?.[0]?.astro;
-  const dayData = data.forecast?.forecastday?.[0]?.day;
+  const hours: any[] = data.forecast?.forecastday?.[0]?.hour ?? [];
+
+  // Find the hour entry closest to now by epoch — avoids server-timezone issues
+  const nowEpoch = Date.now() / 1000;
+  const currentHour = hours.length
+    ? hours.reduce((best: any, h: any) =>
+        Math.abs(h.time_epoch - nowEpoch) < Math.abs(best.time_epoch - nowEpoch) ? h : best
+      )
+    : null;
 
   const epaIdx = c.air_quality?.['us-epa-index'];
 
@@ -48,8 +56,9 @@ export async function getCurrentWeather(city: string, coords?: { lat: number; lo
     feelsLike: c.feelslike_c,
     humidity: c.humidity,
     windSpeed: c.wind_kph,
-    // Fix: use daily_chance_of_rain from the day object rather than cloud coverage
-    precipitationProbability: dayData?.daily_chance_of_rain ?? 0,
+    // Use current hour's chance_of_rain — daily_chance_of_rain covers the whole calendar day
+    // and inflates the value (e.g. 83% at 11pm because it rained that morning)
+    precipitationProbability: currentHour?.chance_of_rain ?? 0,
     condition: c.condition.text,
     conditionCode: wapiConditionToCode(c.condition.text),
     fetchedAt: new Date().toISOString(),

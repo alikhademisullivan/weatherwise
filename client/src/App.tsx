@@ -50,6 +50,7 @@ import {
 } from './hooks/useWeatherConsensus';
 import { useLocation } from './hooks/useLocation';
 import { useSavedLocations } from './hooks/useSavedLocations';
+import { useLocalSensors } from './hooks/useLocalSensors';
 
 type ForecastView = 'daily' | 'hourly' | 'weekend';
 type Theme = 'dark' | 'light';
@@ -122,6 +123,7 @@ export default function App() {
   const { data: feedbackSummary } = useFeedbackSummary(city);
   const { data: historicalData } = useHistorical(city, coords);
   const { data: precipTimeline } = usePrecipTimeline(city, coords);
+  const { data: localSensorData } = useLocalSensors(coords, city);
 
   const { locate, loading: locating, error: geoError } = useLocation(newCity => {
     setCity(newCity);
@@ -519,6 +521,41 @@ export default function App() {
                       </div>
                     </div>
                   )}
+
+                  {/* Local sensor ground-truth reading */}
+                  {localSensorData?.sensor && (() => {
+                    const s = localSensorData.sensor;
+                    const diffC = parseFloat((s.temperature - weather.consensus.temperature).toFixed(1));
+                    const dispDiff = unit === 'F' ? parseFloat((diffC * 9 / 5).toFixed(1)) : diffC;
+                    const agrees = Math.abs(diffC) < 1.5;
+                    const distLabel = s.nearestKm < 1
+                      ? `${Math.round(s.nearestKm * 1000)}m`
+                      : `${s.nearestKm.toFixed(1)}km`;
+                    return (
+                      <div className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/10 px-4 py-2.5">
+                        <span className="text-base shrink-0">📡</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white/50 text-xs">
+                            {s.stationCount} sensor{s.stationCount > 1 ? 's' : ''} · {distLabel} away
+                          </p>
+                          <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                            <span className={`text-sm font-semibold ${agrees ? 'text-emerald-300' : diffC > 0 ? 'text-orange-300' : 'text-blue-300'}`}>
+                              {formatTemp(s.temperature, unit)}
+                            </span>
+                            {agrees
+                              ? <span className="text-xs text-emerald-400/60">confirms models</span>
+                              : <span className={`text-xs ${diffC > 0 ? 'text-orange-400/70' : 'text-blue-400/70'}`}>
+                                  {dispDiff > 0 ? '+' : ''}{dispDiff}° vs models
+                                </span>
+                            }
+                            {s.humidity != null && (
+                              <span className="text-xs text-white/30">· {s.humidity}% RH</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Right: 4-stat mini grid */}
@@ -562,7 +599,7 @@ export default function App() {
                 {precipTimeline && precipTimeline.minutes.length > 0 && (
                   <ErrorBoundary>
                     <div style={fadeStyle(4)} className={fadeClass(4)}>
-                      <PrecipTimeline data={precipTimeline} hours={extendedHourly?.hours} sources={weather.sources} alerts={alertsData?.alerts} />
+                      <PrecipTimeline data={precipTimeline} hours={extendedHourly?.hours} sources={weather.sources} alerts={alertsData?.alerts} localSensor={localSensorData?.sensor} />
                     </div>
                   </ErrorBoundary>
                 )}
@@ -618,6 +655,7 @@ export default function App() {
                       consensus={weather.consensus}
                       accuracy={accuracyData?.sources ?? []}
                       unit={unit}
+                      localSensor={localSensorData?.sensor}
                       onViewScorecard={() => {
                         setShowMore(true);
                         setShowAccuracy(true);
@@ -696,13 +734,14 @@ export default function App() {
                       consensus={weather.consensus}
                       hourly={hourlyData.hours}
                       unit={unit}
+                      localSensor={localSensorData?.sensor}
                     />
                   </ErrorBoundary>
                 )}
 
                 {hourlyData && hourlyData.hours.length > 0 && (
                   <ErrorBoundary>
-                    <PressureHealth hourly={hourlyData.hours} />
+                    <PressureHealth hourly={hourlyData.hours} localSensor={localSensorData?.sensor} />
                   </ErrorBoundary>
                 )}
               </div>

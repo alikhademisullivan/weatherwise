@@ -7,6 +7,7 @@ const DEFAULT_WEIGHTS: Record<string, number> = {
   'OpenWeatherMap': 1.0,
   'Tomorrow.io': 1.0,
   'WeatherAPI': 1.0,
+  'Pirate Weather': 1.0,
 };
 
 function weight(source: string, dynamicWeights: Record<string, number>): number {

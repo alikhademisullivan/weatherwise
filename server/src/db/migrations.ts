@@ -86,6 +86,15 @@ CREATE TABLE IF NOT EXISTS saved_locations (
   created_at  TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, city)
 );
+
+CREATE TABLE IF NOT EXISTS netatmo_tokens (
+  id            INTEGER PRIMARY KEY DEFAULT 1,
+  access_token  TEXT NOT NULL,
+  refresh_token TEXT NOT NULL,
+  expires_at    BIGINT NOT NULL,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (id = 1)
+);
 `;
 
 export async function runMigrations(): Promise<void> {

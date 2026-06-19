@@ -5,6 +5,7 @@ import * as openWeatherMap from '../services/openWeatherMap';
 import * as tomorrowIo from '../services/tomorrowIo';
 import * as weatherApi from '../services/weatherApi';
 import * as pirateWeather from '../services/pirateWeather';
+import { getNearbyStations } from '../services/netatmo';
 import { buildConsensus, mergeForecastDays } from '../services/consensus';
 import { getCached, setCached, buildCacheKey } from '../cache/weatherCache';
 import { getDynamicWeights, getAccuracyScores } from '../db/accuracy';
@@ -19,6 +20,7 @@ import type {
   AlertsResponse,
   SourceReading,
   ForecastDay,
+  LocalSensorReading,
 } from '../types/weather';
 
 const router = Router();
@@ -485,6 +487,58 @@ router.delete('/digest/unsubscribe', async (req: Request, res: Response) => {
     return res.json({ ok: true });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/weather/local-sensors?lat=43.70&lon=-79.42
+// GET /api/weather/local-sensors?city=London,+Ontario,+Canada  (geocodes internally)
+// Returns aggregated readings from nearby Netatmo personal weather stations.
+// Returns 404 when NETATMO_CLIENT_ID / NETATMO_CLIENT_SECRET are not set so the
+// client can silently disable the feature without any console errors.
+router.get('/local-sensors', async (req: Request, res: Response) => {
+  if (!process.env.NETATMO_CLIENT_ID || !process.env.NETATMO_CLIENT_SECRET) {
+    return res.status(404).json({ error: 'Netatmo not configured' });
+  }
+
+  let lat = parseFloat(req.query.lat as string);
+  let lon = parseFloat(req.query.lon as string);
+
+  // Fall back to geocoding a city name when coords aren't provided directly
+  if (isNaN(lat) || isNaN(lon)) {
+    const city = (req.query.city as string)?.trim();
+    if (!city) {
+      return res.status(400).json({ error: 'lat/lon or city is required' });
+    }
+    try {
+      const { data } = await axios.get('https://geocoding-api.open-meteo.com/v1/search', {
+        params: { name: city.split(',')[0].trim(), count: 1, language: 'en', format: 'json' },
+      });
+      if (!data.results?.length) return res.status(404).json({ error: 'City not found' });
+      lat = data.results[0].latitude;
+      lon = data.results[0].longitude;
+    } catch {
+      return res.status(502).json({ error: 'Geocoding failed' });
+    }
+  }
+
+  // Round to 3 decimal places (~110 m precision) so nearby searches share a cache entry
+  const cacheKey = `netatmo:${lat.toFixed(3)},${lon.toFixed(3)}`;
+  const cachedEntry = getCached<{ lat: number; lon: number; sensor: LocalSensorReading; updatedAt: string }>(cacheKey);
+  if (cachedEntry) return res.json({ ...cachedEntry, cached: true });
+
+  try {
+    const sensor = await getNearbyStations(lat, lon);
+    if (!sensor) {
+      return res.status(404).json({ error: 'No nearby Netatmo stations found' });
+    }
+
+    const response = { lat, lon, sensor, updatedAt: new Date().toISOString() };
+    setCached(cacheKey, response, 300); // 5-min TTL — sensor data refreshes every 5–10 min
+    return res.json(response);
+  } catch (err: any) {
+    const detail = err.message ?? 'unknown';
+    console.error('[local-sensors]', detail);
+    return res.status(503).json({ error: 'Netatmo API unavailable', detail });
   }
 });
 

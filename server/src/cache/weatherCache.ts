@@ -8,8 +8,12 @@ export function getCached<T>(key: string): T | undefined {
   return cache.get<T>(key);
 }
 
-export function setCached<T>(key: string, value: T): void {
-  cache.set(key, value);
+export function setCached<T>(key: string, value: T, ttl?: number): void {
+  if (ttl !== undefined) {
+    cache.set(key, value, ttl);
+  } else {
+    cache.set(key, value);
+  }
 }
 
 export function buildCacheKey(city: string, type: 'current' | 'forecast'): string {

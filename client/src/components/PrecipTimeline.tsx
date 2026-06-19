@@ -3,7 +3,7 @@ import {
   ComposedChart, Area, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import type { PrecipTimelineResponse, SourceReading, WeatherAlert } from '../types/weather';
+import type { PrecipTimelineResponse, SourceReading, WeatherAlert, LocalSensorReading } from '../types/weather';
 import type { HourlyReading } from '../types/weather';
 
 type Range = '1h' | '3h' | '6h' | '12h' | '24h' | '48h';
@@ -33,6 +33,7 @@ interface Props {
   hours?: HourlyReading[];
   sources?: SourceReading[];
   alerts?: WeatherAlert[];
+  localSensor?: LocalSensorReading;
 }
 
 function isMinuteLevel(minutes: { time: string }[]): boolean {
@@ -111,7 +112,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   );
 };
 
-export default function PrecipTimeline({ data, hours, sources, alerts }: Props) {
+export default function PrecipTimeline({ data, hours, sources, alerts, localSensor }: Props) {
   const minuteLevel = isMinuteLevel(data.minutes);
 
   const rawMinutes: DataPoint[] = useMemo(() => data.minutes.map(m => ({
@@ -272,6 +273,18 @@ export default function PrecipTimeline({ data, hours, sources, alerts }: Props) 
         </div>
       )}
 
+      {/* Sensor rain notice — shown when nearby Netatmo stations detect active precipitation */}
+      {localSensor?.rainRateMmhr != null && localSensor.rainRateMmhr > 0 && (
+        <div className="mb-3 flex items-start gap-2 rounded-xl bg-emerald-500/8 border border-emerald-400/20 px-3 py-2">
+          <span className="text-emerald-400 text-sm shrink-0">📡</span>
+          <p className="text-emerald-300/80 text-xs leading-relaxed">
+            {localSensor.rainStationCount ?? localSensor.stationCount} nearby sensor{(localSensor.rainStationCount ?? localSensor.stationCount) > 1 ? 's' : ''} detect active rain —{' '}
+            <span className="font-semibold">{localSensor.rainRateMmhr.toFixed(1)} mm/hr</span>
+            {localSensor.rain1h != null && `, ${localSensor.rain1h.toFixed(1)} mm measured last hour`}.
+          </p>
+        </div>
+      )}
+
       {/* Official alert notice — shown when active warnings contradict the forecast chart */}
       {activeStormAlerts.length > 0 && (
         <div className="mb-3 flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-400/25 px-3 py-2.5">
@@ -392,6 +405,15 @@ export default function PrecipTimeline({ data, hours, sources, alerts }: Props) 
           <div className="flex-1 px-2">
             <p className="text-white/25 text-[10px] uppercase tracking-wider mb-0.5">Rain hours</p>
             <p className="text-white/80 text-sm font-semibold">{rainyLabel}</p>
+          </div>
+        )}
+
+        {localSensor?.rain1h != null && (
+          <div className="flex-1 px-2">
+            <p className="text-white/25 text-[10px] uppercase tracking-wider mb-0.5">Sensor (1h)</p>
+            <p className="text-emerald-300/80 text-sm font-semibold">
+              {localSensor.rain1h > 0 ? `${localSensor.rain1h.toFixed(1)} mm` : 'None'}
+            </p>
           </div>
         )}
 

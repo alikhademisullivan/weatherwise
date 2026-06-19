@@ -75,7 +75,8 @@ export async function getCurrentWeather(city: string, coords?: { lat: number; lo
     feelsLike: c.apparentTemperature,
     humidity: Math.round((c.humidity ?? 0) * 100),
     windSpeed: parseFloat(((c.windSpeed ?? 0) * 3.6).toFixed(1)),
-    precipitationProbability: Math.round((c.precipProbability ?? 0) * 100),
+    // Use daily precipProbability (full-day chance) over currently (instantaneous snapshot)
+    precipitationProbability: Math.round((today?.precipProbability ?? c.precipProbability ?? 0) * 100),
     condition,
     conditionCode,
     fetchedAt: new Date().toISOString(),

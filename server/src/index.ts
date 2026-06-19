@@ -8,6 +8,7 @@ import path from 'path';
 import weatherRouter from './routes/weather';
 import askRouter from './routes/ask';
 import authRouter from './routes/auth';
+import netatmoRouter from './routes/netatmo';
 import { runMigrations } from './db/migrations';
 import { scheduleAccuracyCron, runAccuracyJob } from './jobs/accuracyCron';
 import { scheduleDigestCron } from './jobs/digestCron';
@@ -43,6 +44,7 @@ const aiLimiter = rateLimit({
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/netatmo', netatmoRouter);
 app.use('/api/weather', weatherLimiter, weatherRouter);
 app.use('/api/weather/ask', aiLimiter, askRouter);
 

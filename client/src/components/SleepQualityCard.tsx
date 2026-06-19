@@ -1,13 +1,19 @@
-import type { ConsensusReading, HourlyReading } from '../types/weather';
+import type { ConsensusReading, HourlyReading, LocalSensorReading } from '../types/weather';
 import { formatTemp } from '../utils/formatters';
 
 interface Props {
   consensus: ConsensusReading;
   hourly: HourlyReading[];
   unit: 'C' | 'F';
+  localSensor?: LocalSensorReading;
 }
 
-export default function SleepQualityCard({ consensus, hourly, unit }: Props) {
+// Magnus-formula dewpoint approximation from temperature (°C) + relative humidity (%)
+function sensorDewPoint(tempC: number, rh: number): number {
+  return parseFloat((tempC - (100 - rh) / 5).toFixed(1));
+}
+
+export default function SleepQualityCard({ consensus, hourly, unit, localSensor }: Props) {
   const now = new Date();
 
   // Build tonight's sleep window: next occurrence of 9pm → 7am
@@ -43,14 +49,19 @@ export default function SleepQualityCard({ consensus, hourly, unit }: Props) {
     factors.push(`Cool overnight — ${formatTemp(overnightLow, unit)} low`);
   }
 
-  const dp = consensus.dewPoint;
+  // Prefer sensor-derived dewpoint when a nearby station has humidity data
+  const sensorDp = localSensor?.humidity != null
+    ? sensorDewPoint(localSensor.temperature, localSensor.humidity)
+    : undefined;
+  const dp = sensorDp ?? consensus.dewPoint;
+  const dpSource = sensorDp != null ? ' (local sensor)' : '';
   if (dp !== undefined) {
     if (dp > 16) {
       score -= 2;
-      factors.push(`Muggy — ${Math.round(dp)}°C dew point`);
+      factors.push(`Muggy — ${Math.round(dp)}°C dew point${dpSource}`);
     } else if (dp < 10) {
       score += 1;
-      factors.push(`Dry, crisp air — ${Math.round(dp)}°C dew point`);
+      factors.push(`Dry, crisp air — ${Math.round(dp)}°C dew point${dpSource}`);
     }
   }
 

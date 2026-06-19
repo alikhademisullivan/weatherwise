@@ -1,3 +1,17 @@
+export interface LocalSensorReading {
+  stationCount: number;
+  nearestKm: number;
+  temperature: number;
+  humidity?: number;
+  pressure?: number;
+  rain1h?: number;
+  rainRateMmhr?: number;
+  rainStationCount?: number;
+  windSpeed?: number;
+  windDirection?: number;
+  fetchedAt: string;
+}
+
 export interface SourceReading {
   source: string;
   temperature: number;
@@ -59,6 +73,7 @@ export interface ConsensusReading {
     pressure?: number;
     precipitationProbability?: number;
   };
+  localSensor?: LocalSensorReading;
 }
 
 export interface ForecastDay {

@@ -15,11 +15,14 @@ function owmCodeToCondition(id: number, icon: string): { condition: string; cond
   return { condition: 'Unknown', conditionCode: 'unknown' };
 }
 
-function formatSunTime(unixTs: number): string {
-  return new Date(unixTs * 1000).toLocaleTimeString('en-US', {
+// OWM timestamps are UTC; apply the response's timezone offset before formatting
+function formatSunTime(unixTs: number, tzOffsetSec: number): string {
+  const localMs = (unixTs + tzOffsetSec) * 1000;
+  return new Date(localMs).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
+    timeZone: 'UTC',
   });
 }
 
@@ -37,9 +40,20 @@ export async function getCurrentWeather(city: string, coords?: { lat: number; lo
     data.weather[0].icon,
   );
 
-  // Fix: use actual rain data as heuristic instead of cloud coverage
-  const precipMm = data.rain?.['1h'] ?? 0;
-  const precipProb = precipMm > 0 ? 80 : 0;
+  // OWM /weather has no POP field; derive a probability from condition code + observed rain
+  const precipMm = data.rain?.['1h'] ?? data.snow?.['1h'] ?? 0;
+  const id = data.weather[0].id;
+  const precipProb = precipMm > 0
+    ? 90
+    : id < 300  // thunderstorm
+    ? 85
+    : id < 500  // drizzle
+    ? 60
+    : id < 600  // rain
+    ? 75
+    : id < 700  // snow
+    ? 70
+    : 0;
 
   return {
     source: 'OpenWeatherMap',
@@ -57,8 +71,8 @@ export async function getCurrentWeather(city: string, coords?: { lat: number; lo
     windGust: data.wind.gust != null ? parseFloat((data.wind.gust * 3.6).toFixed(1)) : undefined,
     cloudCover: data.clouds?.all,
     precipitationMm: precipMm,
-    sunriseTime: data.sys?.sunrise ? formatSunTime(data.sys.sunrise) : undefined,
-    sunsetTime: data.sys?.sunset ? formatSunTime(data.sys.sunset) : undefined,
+    sunriseTime: data.sys?.sunrise ? formatSunTime(data.sys.sunrise, data.timezone ?? 0) : undefined,
+    sunsetTime: data.sys?.sunset ? formatSunTime(data.sys.sunset, data.timezone ?? 0) : undefined,
   };
 }
 

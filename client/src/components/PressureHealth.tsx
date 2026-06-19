@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import type { HourlyReading } from '../types/weather';
+import type { HourlyReading, LocalSensorReading } from '../types/weather';
 
 interface Settings {
   enabled: boolean;
@@ -22,9 +22,10 @@ function save(s: Settings) {
 
 interface Props {
   hourly: HourlyReading[];
+  localSensor?: LocalSensorReading;
 }
 
-export default function PressureHealth({ hourly }: Props) {
+export default function PressureHealth({ hourly, localSensor }: Props) {
   const [settings, setSettings] = useState<Settings>(load);
 
   function toggle() {
@@ -127,6 +128,22 @@ export default function PressureHealth({ hourly }: Props) {
           <p className="text-xs text-white/25 mt-2">
             24-hour barometric pressure trend (hPa) · rapid drops trigger weather-sensitive conditions
           </p>
+          {localSensor?.pressure != null && (() => {
+            const modelP = pressurePoints.at(-1)?.pressure;
+            const diff = modelP != null
+              ? parseFloat((localSensor.pressure! - modelP).toFixed(1))
+              : null;
+            return (
+              <p className="text-xs text-white/35 mt-1">
+                📡 Nearby sensor: {localSensor.pressure} hPa
+                {diff != null && Math.abs(diff) >= 1 && (
+                  <span className={diff > 0 ? ' text-orange-400/60' : ' text-blue-400/60'}>
+                    {' '}({diff > 0 ? '+' : ''}{diff} vs model)
+                  </span>
+                )}
+              </p>
+            );
+          })()}
         </>
       )}
     </div>
