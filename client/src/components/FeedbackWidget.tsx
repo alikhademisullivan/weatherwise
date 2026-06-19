@@ -45,7 +45,7 @@ export default function FeedbackWidget() {
       {/* Floating trigger button */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 left-3 sm:bottom-6 sm:left-6 bg-white/10 hover:bg-white/15 border border-white/15 text-white/70 hover:text-white rounded-full shadow-lg transition-colors z-40 backdrop-blur-sm flex items-center justify-center h-9 w-9 sm:h-auto sm:w-auto sm:px-4 sm:py-2.5"
+        className="fixed bottom-20 left-3 sm:bottom-6 sm:left-6 bg-white/10 hover:bg-white/15 border border-white/15 text-white/70 hover:text-white rounded-full shadow-lg transition-colors z-40 backdrop-blur-sm flex items-center justify-center h-11 w-11 sm:h-auto sm:w-auto sm:px-4 sm:py-2.5"
         aria-label="Share feedback"
       >
         <span className="sm:hidden text-sm leading-none">★</span>
@@ -97,7 +97,7 @@ export default function FeedbackWidget() {
                     <button
                       key={c.value}
                       onClick={() => setCategory(c.value)}
-                      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                      className={`text-xs px-3 py-2 rounded-lg border transition-colors ${
                         category === c.value
                           ? 'bg-blue-500/25 border-blue-400/50 text-blue-300'
                           : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'

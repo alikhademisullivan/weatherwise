@@ -114,9 +114,10 @@ export default function ForecastChart({ forecast, unit, days }: Props) {
       </div>
 
       {/* Day strip — different display by tier */}
+      <div className="overflow-x-auto -mx-1 px-1 pb-1">
       <div
         className="grid gap-1"
-        style={{ gridTemplateColumns: `repeat(${Math.min(forecast.length, 14)}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${Math.min(forecast.length, 14)}, minmax(48px, 1fr))` }}
       >
         {forecast.map(d => {
           const tier = d.confidenceTier ?? 'high';
@@ -173,6 +174,7 @@ export default function ForecastChart({ forecast, unit, days }: Props) {
             </div>
           );
         })}
+      </div>
       </div>
 
       {/* Chart with uncertainty bands */}

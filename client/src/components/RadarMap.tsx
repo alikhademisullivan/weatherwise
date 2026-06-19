@@ -223,7 +223,7 @@ export default function RadarMap({ city, lat: propLat, lon: propLon, fullPage = 
 
           {/* Info toggle */}
           <button onClick={() => setShowInfo(v => !v)}
-            className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center transition-colors ${
+            className={`w-9 h-9 rounded-lg text-sm flex items-center justify-center transition-colors ${
               showInfo ? 'bg-blue-500/30 text-blue-300' : 'bg-white/8 text-white/40 hover:text-white/70'
             }`} title="How to read radar"
           >ℹ</button>
@@ -305,19 +305,19 @@ export default function RadarMap({ city, lat: propLat, lon: propLon, fullPage = 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Step ‹ */}
           <button onClick={() => { setPlaying(false); setFrameIdx(i => Math.max(0, i - 1)); }}
-            className="w-8 h-8 rounded-lg bg-white/8 text-white/50 hover:text-white flex items-center justify-center">
+            className="w-10 h-10 rounded-lg bg-white/8 text-white/50 hover:text-white flex items-center justify-center">
             ‹
           </button>
 
           {/* Play / Pause */}
           <button onClick={() => setPlaying(p => !p)}
-            className="w-9 h-9 rounded-xl bg-blue-500/20 hover:bg-blue-500/35 text-blue-300 flex items-center justify-center text-lg transition-colors">
+            className="w-11 h-11 rounded-xl bg-blue-500/20 hover:bg-blue-500/35 text-blue-300 flex items-center justify-center text-lg transition-colors">
             {playing ? '⏸' : '▶'}
           </button>
 
           {/* Step › */}
           <button onClick={() => { setPlaying(false); setFrameIdx(i => Math.min(allFrames.length - 1, i + 1)); }}
-            className="w-8 h-8 rounded-lg bg-white/8 text-white/50 hover:text-white flex items-center justify-center">
+            className="w-10 h-10 rounded-lg bg-white/8 text-white/50 hover:text-white flex items-center justify-center">
             ›
           </button>
 

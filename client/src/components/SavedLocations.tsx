@@ -18,7 +18,7 @@ export default function SavedLocations({ locations, activeCity, onSelect, onRemo
         return (
           <span
             key={loc.city}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
               isActive
                 ? 'bg-blue-500/30 border border-blue-400/40 text-blue-200'
                 : 'bg-white/8 border border-white/15 text-white/60 hover:text-white/90 hover:bg-white/12'
@@ -35,7 +35,7 @@ export default function SavedLocations({ locations, activeCity, onSelect, onRemo
             <button
               type="button"
               onClick={e => { e.stopPropagation(); onRemove(loc.city); }}
-              className="ml-0.5 text-white/40 hover:text-white/80 transition-colors leading-none"
+              className="ml-0.5 text-white/40 hover:text-white/80 transition-colors leading-none p-1 -m-1"
               title="Remove"
               aria-label={`Remove ${loc.label}`}
             >

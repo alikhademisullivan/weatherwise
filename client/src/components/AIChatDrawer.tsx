@@ -116,7 +116,7 @@ export default function AIChatDrawer({ city, isOpen, onClose }: Props) {
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900/95 backdrop-blur-xl border-t border-white/15 rounded-t-2xl shadow-2xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] max-h-[75vh] sm:max-h-[60vh] flex flex-col">
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-semibold text-white">Ask WeatherWise AI</h3>
-          <button onClick={onClose} className="text-white/40 hover:text-white/70 text-lg leading-none transition-colors">✕</button>
+          <button onClick={onClose} className="text-white/40 hover:text-white/70 text-lg leading-none transition-colors w-9 h-9 flex items-center justify-center rounded-lg -mr-1">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-3 mb-3">
@@ -140,7 +140,7 @@ export default function AIChatDrawer({ city, isOpen, onClose }: Props) {
                   <button
                     onClick={() => rateMessage(i, 'up', msg)}
                     title="This was helpful"
-                    className={`text-sm px-1.5 py-0.5 rounded transition-colors ${
+                    className={`text-sm min-w-[36px] min-h-[36px] flex items-center justify-center rounded transition-colors ${
                       ratings[i] === 'up' ? 'text-emerald-400' : 'text-white/30 hover:text-emerald-400'
                     }`}
                   >
@@ -149,7 +149,7 @@ export default function AIChatDrawer({ city, isOpen, onClose }: Props) {
                   <button
                     onClick={() => rateMessage(i, 'down', msg)}
                     title="This wasn't helpful"
-                    className={`text-sm px-1.5 py-0.5 rounded transition-colors ${
+                    className={`text-sm min-w-[36px] min-h-[36px] flex items-center justify-center rounded transition-colors ${
                       ratings[i] === 'down' ? 'text-red-400' : 'text-white/30 hover:text-red-400'
                     }`}
                   >

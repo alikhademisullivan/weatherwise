@@ -153,27 +153,27 @@ export default function AboutPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-4 mt-6">
+          <div className="flex items-center gap-2 mt-6">
             <a
               href="https://github.com/alikhademisullivan"
               target="_blank"
               rel="noopener noreferrer"
               title="GitHub"
-              className="text-white/40 hover:text-white transition-colors"
+              className="text-white/40 hover:text-white transition-colors p-2 -m-2 rounded-lg"
             >
               <GitHubIcon />
             </a>
             <a
               href="#"
               title="LinkedIn"
-              className="text-white/40 hover:text-white transition-colors"
+              className="text-white/40 hover:text-white transition-colors p-2 -m-2 rounded-lg"
             >
               <LinkedInIcon />
             </a>
             <a
               href="mailto:sullivanali03@gmail.com"
               title="Email"
-              className="text-white/40 hover:text-white transition-colors"
+              className="text-white/40 hover:text-white transition-colors p-2 -m-2 rounded-lg"
             >
               <EmailIcon />
             </a>

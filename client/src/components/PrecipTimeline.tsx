@@ -381,7 +381,7 @@ export default function PrecipTimeline({ data, hours, sources, alerts, localSens
       </ResponsiveContainer>
 
       {/* Stats row */}
-      <div className="flex items-center mt-3 pt-3 border-t border-white/8 text-center divide-x divide-white/8">
+      <div className="flex flex-wrap items-center mt-3 pt-3 border-t border-white/8 text-center gap-y-2 [&>*:not(:first-child)]:border-l [&>*:not(:first-child)]:border-white/8">
         <div className="flex-1 px-2">
           <p className="text-white/25 text-[10px] uppercase tracking-wider mb-0.5">Peak chance</p>
           <p className="text-sm font-semibold" style={{ color: status.color }}>{peakProb}%</p>

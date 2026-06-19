@@ -167,7 +167,7 @@ export default function CommuteMode({ hours, unit }: Props) {
           </button>
         </div>
       ) : (
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <CommuteCard
             label={getCommuteLabel(times.morning)}
             time={times.morning}
